@@ -1,0 +1,62 @@
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults: { run: { working-directory: desktop } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: Copy-Item -Recurse ../web ./web
+        shell: pwsh
+      - run: npm install
+      - run: npm run fetch-bin
+      - run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nazzil-Windows
+          path: desktop/dist/*.exe
+
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: android } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.10.2" }
+      - run: gradle assembleRelease --no-daemon
+      - run: |
+          mkdir -p out
+          for f in app/build/outputs/apk/release/*.apk; do
+            n=$(basename "$f" | sed 's/app-/Nazzil-/; s/-release//')
+            cp "$f" "out/$n"
+          done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nazzil-Android
+          path: android/out/*.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with: { files: dist/* }
