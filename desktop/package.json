@@ -1,0 +1,27 @@
+{
+  "name": "nazzil",
+  "productName": "Nazzil",
+  "version": "1.0.0",
+  "description": "نزّل — استوديو الفيديو والصوت",
+  "main": "main.js",
+  "author": "Nazzil",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "fetch-bin": "node fetch-bin.js",
+    "dist": "electron-builder --win nsis portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "app.nazzil.desktop",
+    "productName": "Nazzil",
+    "files": ["main.js", "server.js", "web/**"],
+    "extraResources": [{ "from": "bin", "to": "bin" }],
+    "win": { "target": ["nsis", "portable"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Nazzil-Setup-${version}.${ext}" },
+    "portable": { "artifactName": "Nazzil-Portable-${version}.${ext}" }
+  }
+}
