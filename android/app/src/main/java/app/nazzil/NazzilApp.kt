@@ -23,8 +23,8 @@ object Tools {
     fun init(app: Application) = io.execute {
         try { YoutubeDL.getInstance().init(app); ytdlp = true } catch (e: Exception) { Log.e("Nazzil", "yt-dlp init", e) }
         try { FFmpeg.getInstance().init(app); ffmpeg = true } catch (e: Exception) { Log.e("Nazzil", "ffmpeg init", e) }
+        ready = true
         // Keep yt-dlp current: YouTube changes often and old versions stop working.
         try { YoutubeDL.getInstance().updateYoutubeDL(app, YoutubeDL.UpdateChannel._STABLE) } catch (e: Exception) { Log.w("Nazzil", "update", e) }
-        ready = true
     }
 }

@@ -1,8 +1,111 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#15161a"><link rel="stylesheet" href="style.css"><title>نزّل — فيديو وصوت</title></head>
-<body><div class="shell"><header class="topbar"><div class="brand"><div class="mark">↓</div><div><strong>نزّل</strong><span>استوديو الفيديو والصوت</span></div></div><div class="top-actions"><span class="live"><i></i> محلي وآمن</span><button id="themeBtn" class="icon-btn" aria-label="تبديل المظهر">☼</button></div></header>
-<section class="welcome"><div><p class="tag">مساحة التحويل الخاصة بك</p><h1>من الرابط إلى ملف جاهز<br><em>بلمسة واحدة.</em></h1><p class="sub">تنزيل واضح، سريع، وبلا إعلانات. ملفاتك تبقى على جهازك.</p></div><div class="orbit"><span>MP3</span><span>MP4</span><span>OFFLINE</span></div></section>
-<div class="workspace"><section class="panel download-panel"><div class="panel-head"><div><span class="step">01</span><h2>أضف مصدر الفيديو</h2></div><span id="tools" class="tools">فحص الأدوات…</span></div><form id="form"><label class="url-label">رابط YouTube<input id="url" type="url" required placeholder="ألصق الرابط هنا…"><button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط">×</button></label><div id="dropzone" class="dropzone"><span>أو اسحب الرابط وأسقطه هنا</span><small>ندعم روابط YouTube العامة فقط</small></div>
-<div class="panel-head format-title"><div><span class="step">02</span><h2>اختر الصيغة</h2></div><span class="quality-label">جودة تلقائية</span></div><div class="formats"><label><input type="radio" name="kind" value="mp3" checked><span class="format-card"><b><i>♫</i> MP3</b><small>صوت عالي الجودة · مناسب للموسيقى والبودكاست</small><mark>الأكثر طلبًا</mark></span></label><label><input type="radio" name="kind" value="mp4"><span class="format-card"><b><i>▶</i> MP4</b><small>فيديو وصوت · أفضل جودة متاحة</small></span></label></div>
-<label class="consent"><input id="rights" type="checkbox" required><span>لدي الحق في تنزيل هذا المحتوى أو أملك إذنًا بذلك.</span></label><button id="submit" class="download-btn"><span>بدء التنزيل</span><b>⌘ Enter</b></button></form><div id="message" class="message" hidden></div></section>
-<aside class="side"><section class="side-card"><div class="side-title"><h3>نشاطك الأخير</h3><button id="clearHistory" class="text-btn">مسح الكل</button></div><div id="history" class="history"><div class="history-empty">لا توجد تنزيلات بعد<br><small>ستظهر ملفاتك هنا</small></div></div></section><section class="side-card privacy"><div class="privacy-icon">✓</div><div><h3>خصوصيتك أولاً</h3><p>المعالجة تتم على جهازك. لا حسابات، لا تتبع، لا إعلانات.</p></div></section></aside></div>
-<footer><span>نزّل 1.0</span><span>يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer></div><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d11">
+<link rel="stylesheet" href="style.css">
+<title>نزّل — فيديو وصوت</title>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><div class="mark">↓</div><div><strong>نزّل</strong><span>استوديو الفيديو والصوت</span></div></div>
+    <div class="top-actions">
+      <span class="live"><i></i> محلي وآمن</span>
+      <button id="settingsBtn" class="icon-btn" aria-label="الإعدادات" title="الإعدادات">⚙</button>
+      <button id="themeBtn" class="icon-btn" aria-label="تبديل المظهر" title="المظهر">☼</button>
+    </div>
+  </header>
+
+  <section class="welcome">
+    <div>
+      <p class="tag">مساحة التحويل الخاصة بك</p>
+      <h1>من الرابط إلى ملف جاهز<br><em>بلمسة واحدة.</em></h1>
+      <p class="sub">YouTube وأكثر من 1000 موقع · قوائم تشغيل · حتى 4K · بلا إعلانات. ملفاتك تبقى على جهازك.</p>
+    </div>
+    <div class="orbit"><span>MP3</span><span>4K</span><span>OFFLINE</span></div>
+  </section>
+
+  <div class="workspace">
+    <section class="panel download-panel">
+      <div class="panel-head"><div><span class="step">01</span><h2>أضف الرابط</h2></div><span id="tools" class="tools">فحص الأدوات…</span></div>
+      <form id="form" novalidate>
+        <label class="url-label">رابط الفيديو أو قائمة التشغيل
+          <input id="url" type="url" required placeholder="https://youtube.com/watch?v=…" autocomplete="off">
+          <button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط">×</button>
+        </label>
+        <div id="dropzone" class="dropzone" role="button" tabindex="0"><span>اسحب الرابط هنا أو اضغط للصق من الحافظة</span><small>YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها</small></div>
+
+        <div id="preview" class="preview" hidden></div>
+
+        <div class="panel-head format-title"><div><span class="step">02</span><h2>الصيغة والجودة</h2></div></div>
+        <div class="formats">
+          <label><input type="radio" name="kind" value="mp3" checked><span class="format-card"><b><i>♫</i> MP3</b><small>صوت متوافق مع كل الأجهزة</small><mark>الأكثر طلبًا</mark></span></label>
+          <label><input type="radio" name="kind" value="m4a"><span class="format-card"><b><i>♪</i> M4A</b><small>صوت أصلي بلا إعادة ترميز</small></span></label>
+          <label><input type="radio" name="kind" value="mp4"><span class="format-card"><b><i>▶</i> MP4</b><small>فيديو يعمل في كل مكان</small></span></label>
+          <label><input type="radio" name="kind" value="webm"><span class="format-card"><b><i>◆</i> WEBM</b><small>أعلى جودة · حتى 8K</small></span></label>
+        </div>
+        <div class="row">
+          <label class="field" id="videoQ">دقة الفيديو
+            <select id="quality">
+              <option value="best">أفضل متاح</option><option value="2160">4K ‏(2160p)</option><option value="1440">1440p</option>
+              <option value="1080" selected>1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option>
+            </select>
+          </label>
+          <label class="field" id="audioQ">جودة الصوت
+            <select id="abr"><option value="0">الأعلى (VBR)</option><option value="320">320 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option></select>
+          </label>
+        </div>
+
+        <details class="advanced" id="advanced">
+          <summary><span class="step">03</span> خيارات متقدمة</summary>
+          <div class="opts">
+            <label class="switch"><input type="checkbox" id="playlist"><span>تنزيل قائمة التشغيل كاملة</span></label>
+            <label class="switch"><input type="checkbox" id="meta" checked><span>تضمين الغلاف والبيانات (العنوان، الفنان)</span></label>
+            <label class="switch"><input type="checkbox" id="subs"><span>تضمين الترجمة (عربي / إنجليزي)</span></label>
+            <label class="switch"><input type="checkbox" id="sponsor"><span>حذف الإعلانات المدمجة والمقدمات (SponsorBlock)</span></label>
+            <div class="trim">
+              <span>قص مقطع</span>
+              <input id="trimFrom" placeholder="من 0:00" inputmode="numeric" dir="ltr">
+              <input id="trimTo" placeholder="إلى 1:30" inputmode="numeric" dir="ltr">
+            </div>
+          </div>
+        </details>
+
+        <label class="consent"><input id="rights" type="checkbox"><span>لدي الحق في تنزيل هذا المحتوى أو أملك إذنًا بذلك.</span></label>
+        <button id="submit" class="download-btn"><span>إضافة إلى التنزيلات</span><b>Ctrl ↵</b></button>
+      </form>
+      <div id="message" class="message" hidden></div>
+    </section>
+
+    <aside class="side">
+      <section class="side-card">
+        <div class="side-title"><h3>قائمة التنزيل <em id="queueCount"></em></h3></div>
+        <div id="queue" class="queue"><div class="history-empty">لا توجد تنزيلات جارية</div></div>
+      </section>
+      <section class="side-card">
+        <div class="side-title"><h3>نشاطك الأخير</h3><button id="clearHistory" class="text-btn">مسح الكل</button></div>
+        <div id="history" class="history"></div>
+      </section>
+      <section class="side-card privacy"><div class="privacy-icon">✓</div><div><h3>خصوصيتك أولاً</h3><p>المعالجة تتم على جهازك. لا حسابات، لا تتبع، لا إعلانات.</p></div></section>
+    </aside>
+  </div>
+
+  <dialog id="settings" class="settings">
+    <form method="dialog">
+      <h3>الإعدادات</h3>
+      <div class="set-row" id="folderRow"><div><b>مجلد الحفظ</b><small id="folderPath">—</small></div><button type="button" id="pickFolder" class="ghost">تغيير</button><button type="button" id="openFolder" class="ghost">فتح</button></div>
+      <div class="set-row"><div><b>التنزيلات المتزامنة</b><small>عدد الملفات التي تُنزّل في نفس الوقت</small></div><select id="parallel"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+      <div class="set-row" id="clipRow"><div><b>لصق تلقائي</b><small>التقاط الرابط من الحافظة عند فتح التطبيق</small></div><input type="checkbox" id="autoClip" checked></div>
+      <div class="set-row"><div><b>محرك التنزيل</b><small id="engineVer">yt-dlp</small></div><button type="button" id="updateBtn" class="ghost">تحديث</button></div>
+      <button class="download-btn" value="close">تم</button>
+    </form>
+  </dialog>
+
+  <footer><span>نزّل 2.0</span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
+</div>
+<script src="ytdlp.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -58,6 +58,11 @@ class MainActivity : AppCompatActivity() {
         if (loaded) deliverSharedUrl()
     }
 
+    /** Delivers an RPC result back to the page. */
+    fun reply(id: Int, json: String) = runOnUiThread {
+        web.evaluateJavascript("window.__nzReply($id, ${JSONObject.quote(json)})", null)
+    }
+
     private fun deliverSharedUrl() {
         val url = pendingUrl ?: return
         pendingUrl = null
