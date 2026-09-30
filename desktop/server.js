@@ -1,93 +1,176 @@
-// Local-only HTTP API (127.0.0.1) that runs yt-dlp without a shell. Mirrors the original server.py contract.
+// Local-only RPC server (127.0.0.1) that drives yt-dlp without a shell.
 const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
+const { buildArgs, parseLine, summarizeInfo, validUrl } = require("./web/ytdlp.js");
 
-const ALLOWED_HOSTS = /^(www\.|m\.|music\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i;
-const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mp3": "audio/mpeg", ".mp4": "video/mp4" };
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png" };
+const EXE = process.platform === "win32" ? ".exe" : "";
 
-function exe(binDir, name) {
-  const local = path.join(binDir, process.platform === "win32" ? name + ".exe" : name);
-  return fs.existsSync(local) ? local : name;
-}
-function has(cmd) {
-  return new Promise(res => {
-    const p = spawn(cmd, ["-version"], { windowsHide: true });
-    p.on("error", () => res(false));
-    p.on("close", code => res(code === 0));
+function run(cmd, args, { timeout = 60000 } = {}) {
+  return new Promise(resolve => {
+    execFile(cmd, args, { windowsHide: true, timeout, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) =>
+      resolve({ ok: !err, stdout: String(stdout || ""), stderr: String(stderr || ""), err }));
   });
 }
-function validUrl(raw) {
-  try { const u = new URL(String(raw).trim()); return u.protocol === "https:" && ALLOWED_HOSTS.test(u.hostname) ? u.href : null; }
-  catch { return null; }
-}
-function json(res, code, body) { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(body)); }
-function readBody(req) {
-  return new Promise((res, rej) => { let d = ""; req.on("data", c => { d += c; if (d.length > 1e5) req.destroy(); }); req.on("end", () => res(d)); req.on("error", rej); });
+function lastError(text) {
+  const line = String(text).split(/\r?\n/).reverse().find(l => /ERROR/.test(l)) || "";
+  const msg = line.replace(/^.*?ERROR:\s*(\[[^\]]+\]\s*)?([\w-]+:\s*)?/, "").trim();
+  if (/Unsupported URL/i.test(line)) return "هذا الموقع أو الرابط غير مدعوم.";
+  if (/Private video|Sign in|login/i.test(line)) return "المحتوى خاص أو يتطلب تسجيل الدخول.";
+  if (/not available|unavailable|removed/i.test(line)) return "المقطع غير متاح.";
+  if (/HTTP Error 403|Forbidden/i.test(line)) return "رفض الموقع الطلب. جرّب تحديث محرك التنزيل من الإعدادات.";
+  return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, outDir, openPath }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder }) {
   webDir = path.resolve(webDir);
-  fs.mkdirSync(outDir, { recursive: true });
-  const ytdlp = exe(binDir, "yt-dlp"), ffmpeg = exe(binDir, "ffmpeg");
-  const jobs = new Map();
-  const safeFile = name => { const f = path.basename(decodeURIComponent(name)); const p = path.join(outDir, f); return fs.existsSync(p) ? p : null; };
+  fs.mkdirSync(dataDir, { recursive: true });
+  const settingsFile = path.join(dataDir, "settings.json");
+  const settings = Object.assign({ folder: defaultOut, produced: [] }, (() => { try { return JSON.parse(fs.readFileSync(settingsFile, "utf8")); } catch { return {}; } })());
+  const saveSettings = () => fs.writeFile(settingsFile, JSON.stringify(settings), () => {});
 
-  function runJob(id, url, kind) {
-    const job = { state: "working", progress: 0 };
-    jobs.set(id, job);
-    const args = ["--no-playlist", "--newline", "--no-mtime", "--ffmpeg-location", path.dirname(ffmpeg) === "." ? ffmpeg : path.dirname(ffmpeg),
-      "-P", outDir, "-o", "%(title).150B [%(id)s].%(ext)s", "--print", "after_move:filepath"];
-    if (kind === "mp3") args.push("-x", "--audio-format", "mp3", "--audio-quality", "0");
-    else args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b", "--merge-output-format", "mp4");
-    args.push("--", url);
+  // Keep a writable copy of yt-dlp so `-U` self-updates work even from Program Files.
+  let ytdlp = path.join(binDir, "yt-dlp" + EXE);
+  const userYt = path.join(dataDir, "yt-dlp" + EXE);
+  try {
+    if (fs.existsSync(ytdlp) && (!fs.existsSync(userYt) || fs.statSync(userYt).size === 0)) fs.copyFileSync(ytdlp, userYt);
+    if (fs.existsSync(userYt)) ytdlp = userYt;
+  } catch {}
+  if (!fs.existsSync(ytdlp)) ytdlp = "yt-dlp";
+  const ffmpeg = fs.existsSync(path.join(binDir, "ffmpeg" + EXE)) ? path.join(binDir, "ffmpeg" + EXE) : "ffmpeg";
+
+  const jobs = new Map();
+  let parallel = 3;
+
+  function remember(p) {
+    settings.produced = [p, ...settings.produced.filter(x => x !== p)].slice(0, 300);
+    saveSettings();
+  }
+  function pump() {
+    const working = [...jobs.values()].filter(j => j.state === "working").length;
+    const next = [...jobs.values()].filter(j => j.state === "queued");
+    for (let i = 0; i < Math.min(parallel - working, next.length); i++) start(next[i]);
+  }
+  function start(job) {
+    job.state = "working";
+    const tempDir = path.join(dataDir, "tmp", job.id);
+    const args = buildArgs(job.opts, { outDir: settings.folder, ffmpeg, tempDir });
     const p = spawn(ytdlp, args, { windowsHide: true });
-    let last = "", err = "";
-    p.stdout.on("data", d => {
-      for (const line of d.toString().split(/\r?\n/)) {
-        const m = line.match(/\[download\]\s+([\d.]+)%/);
-        if (m) job.progress = parseFloat(m[1]);
-        else if (line.trim() && fs.existsSync(line.trim())) last = line.trim();
-      }
-    });
-    p.stderr.on("data", d => { err += d.toString(); if (err.length > 4000) err = err.slice(-4000); });
+    job.proc = p;
+    let err = "";
+    // Progress arrives on stdout, post-processing and errors on stderr: parse both.
+    const reader = () => {
+      let buf = "";
+      return d => {
+        buf += d.toString();
+        const lines = buf.split(/\r?\n/); buf = lines.pop();
+        for (const line of lines) {
+          const ev = parseLine(line);
+          if (!ev) continue;
+          if (ev.file) { if (!job.files.includes(ev.file)) job.files.push(ev.file); }
+          else if (job.state === "working") Object.assign(job, ev);
+        }
+      };
+    };
+    p.stdout.on("data", reader());
+    const errReader = reader();
+    p.stderr.on("data", d => { errReader(d); err += d.toString(); if (err.length > 8000) err = err.slice(-8000); });
     p.on("error", e => Object.assign(job, { state: "error", error: "تعذر تشغيل yt-dlp: " + e.message }));
     p.on("close", code => {
-      if (job.state !== "working") return;
-      if (code === 0 && last) Object.assign(job, { state: "done", file: path.basename(last), name: path.basename(last, path.extname(last)) });
-      else Object.assign(job, { state: "error", error: (err.split("\n").reverse().find(l => l.includes("ERROR")) || "تعذر إكمال العملية").trim() });
+      job.proc = null;
+      fs.rm(tempDir, { recursive: true, force: true }, () => {});
+      if (job.state === "working") {
+        if (code === 0 && job.files.length) {
+          const file = job.files.length > 1 ? path.dirname(job.files[0]) : job.files[0];
+          Object.assign(job, { state: "done", progress: 100, file, count: job.files.length });
+          remember(file);
+        } else {
+          Object.assign(job, { state: "error", error: code === 0 ? "لم يُنشأ أي ملف." : lastError(err) });
+        }
+      }
+      pump();
     });
   }
+  function killTree(p) {
+    if (!p) return;
+    if (process.platform === "win32") execFile("taskkill", ["/pid", String(p.pid), "/T", "/F"], { windowsHide: true }, () => {});
+    else p.kill("SIGTERM");
+  }
+  const publicJob = j => ({ id: j.id, kind: j.opts.kind, title: j.title, state: j.state, progress: j.progress, speed: j.speed, eta: j.eta,
+    item: j.item, items: j.items, stage: j.stage, file: j.file, count: j.count, error: j.error });
+
+  const methods = {
+    async status() {
+      const [v, f] = await Promise.all([run(ytdlp, ["--version"], { timeout: 15000 }), run(ffmpeg, ["-version"], { timeout: 15000 })]);
+      return { yt_dlp: v.ok, ffmpeg: f.ok, version: v.stdout.trim(), folder: settings.folder, canPickFolder: true, platform: "windows" };
+    },
+    async info({ url }) {
+      const u = validUrl(url);
+      if (!u) throw new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://");
+      const r = await run(ytdlp, ["-J", "--flat-playlist", "--no-warnings", "--playlist-end", "500", "--", u], { timeout: 45000 });
+      if (!r.ok) throw new Error(lastError(r.stderr));
+      return summarizeInfo(JSON.parse(r.stdout));
+    },
+    async download(body) {
+      if (!body.rightsConfirmed) throw new Error("يجب تأكيد امتلاك حق التنزيل.");
+      const url = validUrl(body.url);
+      if (!url) throw new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://");
+      const id = crypto.randomUUID();
+      jobs.set(id, { id, opts: { ...body, url }, title: String(body.title || url).slice(0, 200), state: "queued", progress: 0, files: [] });
+      pump();
+      return { jobId: id };
+    },
+    async jobs() { return { jobs: [...jobs.values()].reverse().map(publicJob) }; },
+    async cancel({ id }) {
+      const j = jobs.get(id);
+      if (j && (j.state === "working" || j.state === "queued")) { j.state = "cancelled"; killTree(j.proc); pump(); }
+      return { ok: true };
+    },
+    async dismiss({ id }) { const j = jobs.get(id); if (j && !j.proc) jobs.delete(id); return { ok: true }; },
+    async settings({ parallel: n }) { if (n >= 1 && n <= 5) { parallel = n; pump(); } return { ok: true }; },
+    async open({ file }) {
+      const target = file ? path.resolve(file) : settings.folder;
+      const allowed = !file || settings.produced.includes(target);
+      if (!allowed || !fs.existsSync(target)) throw new Error("الملف غير موجود. ربما نُقل أو حُذف.");
+      openPath(target);
+      return { ok: true };
+    },
+    async pickFolder() {
+      const folder = await pickFolder(settings.folder);
+      if (folder) { settings.folder = folder; saveSettings(); }
+      return { folder: settings.folder };
+    },
+    async update() {
+      const r = await run(ytdlp, ["-U"], { timeout: 120000 });
+      if (!r.ok) throw new Error(lastError(r.stderr + r.stdout) || "فشل التحديث");
+      const v = await run(ytdlp, ["--version"]);
+      return { version: v.stdout.trim() };
+    },
+  };
 
   const server = http.createServer(async (req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
-    try {
-      if (u.pathname === "/api/status") return json(res, 200, { yt_dlp: await has(ytdlp), ffmpeg: await has(ffmpeg) });
-      if (u.pathname === "/api/download" && req.method === "POST") {
-        const body = JSON.parse(await readBody(req) || "{}");
-        if (!body.rightsConfirmed) return json(res, 400, { error: "يجب تأكيد امتلاك حق التنزيل." });
-        const url = validUrl(body.url);
-        if (!url) return json(res, 400, { error: "الرابط غير صالح. ندعم روابط YouTube بصيغة https فقط." });
-        const kind = body.kind === "mp4" ? "mp4" : "mp3";
-        const id = crypto.randomUUID();
-        runJob(id, url, kind);
-        return json(res, 200, { jobId: id });
-      }
-      let m;
-      if ((m = u.pathname.match(/^\/api\/jobs\/([\w-]+)$/))) return json(res, jobs.has(m[1]) ? 200 : 404, jobs.get(m[1]) || { state: "error", error: "المهمة غير موجودة" });
-      if ((m = u.pathname.match(/^\/api\/open\/(.+)$/)) && req.method === "POST") {
-        const p = safeFile(m[1]); if (p) openPath(p); return json(res, p ? 200 : 404, { ok: !!p });
-      }
-      if ((m = u.pathname.match(/^\/files\/(.+)$/))) {
-        const p = safeFile(m[1]); if (!p) return json(res, 404, { error: "not found" });
-        res.writeHead(200, { "Content-Type": MIME[path.extname(p)] || "application/octet-stream", "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(p))}` });
-        return fs.createReadStream(p).pipe(res);
-      }
-      const rel = u.pathname === "/" ? "index.html" : path.normalize(u.pathname).replace(/^[\\/]+/, "");
-      const file = path.join(webDir, rel);
-      if (!file.startsWith(webDir) || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
-      res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
-      fs.createReadStream(file).pipe(res);
-    } catch (e) { json(res, 500, { error: String(e.message || e) }); }
+    const send = (code, body) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(body)); };
+    const m = u.pathname.match(/^\/api\/(\w+)$/);
+    if (m) {
+      // Only accept same-origin requests so other local web pages can't drive the downloader.
+      const origin = req.headers.origin;
+      if (req.method !== "POST" || (origin && origin !== `http://127.0.0.1:${server.address().port}`)) return send(403, { error: "forbidden" });
+      const fn = methods[m[1]];
+      if (!fn) return send(404, { error: "unknown method" });
+      let raw = "";
+      req.on("data", c => { raw += c; if (raw.length > 1e5) req.destroy(); });
+      req.on("end", async () => {
+        try { send(200, await fn(JSON.parse(raw || "{}"))); }
+        catch (e) { send(400, { error: String(e.message || e) }); }
+      });
+      return;
+    }
+    const rel = u.pathname === "/" ? "index.html" : path.normalize(decodeURIComponent(u.pathname)).replace(/^[\\/]+/, "");
+    const file = path.join(webDir, rel);
+    if (!file.startsWith(webDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
+    fs.createReadStream(file).pipe(res);
   });
   return new Promise(resolve => server.listen(0, "127.0.0.1", () => resolve(server.address().port)));
 }
