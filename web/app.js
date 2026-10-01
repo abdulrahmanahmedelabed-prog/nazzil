@@ -219,7 +219,6 @@ $("form").addEventListener("submit", async e => {
   const urls = extractUrls($("url").value);
   const url = urls[0] || $("url").value.trim();
   if (!looksLikeUrl(url)) { show(esc(t("ألصق رابطًا صحيحًا يبدأ بـ https://")), true); $("url").focus(); return; }
-  if (!$("rights").checked) { show(esc(t("أكّد أن لديك الحق في تنزيل هذا المحتوى.")), true); return; }
   savePrefs();
   $("submit").disabled = true;
   try {
@@ -228,7 +227,7 @@ $("form").addEventListener("submit", async e => {
       playlist: $("playlist").checked, meta: prefs.meta, subs: prefs.subs, sponsor: prefs.sponsor,
       rate: prefs.rate, cookies: status.platform === "android" ? "" : prefs.cookies,
       from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value),
-      title: lastInfo?.title || url, rightsConfirmed: true,
+      title: lastInfo?.title || url,
     };
     if (urls.length > 1) {
       for (const u of urls) await rpc("download", { ...body, url: u, title: u, playlist: false });
@@ -263,6 +262,7 @@ $("url").addEventListener("paste", e => {
   if (urls.length > 1) { e.preventDefault(); $("url").value = urls.join(" "); }
   setTimeout(queueInfo, 0);
 });
+$("browseBtn").addEventListener("click", () => rpc("browse").catch(err => show(esc(t(err.message)), true)));
 $("clearUrl").addEventListener("click", () => { $("url").value = ""; queueInfo(); $("url").focus(); });
 $("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); $("historySearch").value = ""; renderHistory(); });
 $("historySearch").addEventListener("input", renderHistory);

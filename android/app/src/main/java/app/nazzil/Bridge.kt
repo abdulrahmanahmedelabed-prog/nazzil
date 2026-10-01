@@ -43,12 +43,12 @@ class Bridge(private val activity: MainActivity) {
             JSONObject().put("__raw", res.out)
         }
         "download" -> {
-            if (!a.optBoolean("rightsConfirmed")) throw Exception("يجب تأكيد امتلاك حق التنزيل.")
             val args = a.getJSONArray("args").let { arr -> List(arr.length()) { arr.getString(it) } }
             activity.ensureNotificationPermission()
             JSONObject().put("jobId", Downloads.add(a.optString("kind", "mp3"), a.optString("title"), args))
         }
         "jobs" -> JSONObject().put("jobs", Downloads.list())
+        "browse" -> { activity.runOnUiThread { activity.startActivity(Intent(activity, BrowseActivity::class.java)) }; ok() }
         "pause" -> { Downloads.pause(a.getString("id")); ok() }
         "resume" -> { Downloads.resume(a.getString("id")); ok() }
         "cancel" -> { Downloads.cancel(a.getString("id")); ok() }

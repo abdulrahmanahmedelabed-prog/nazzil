@@ -1,9 +1,30 @@
-const { app, BrowserWindow, shell, Menu, dialog, Notification } = require("electron");
+const { app, BrowserWindow, shell, Menu, dialog, Notification, ipcMain } = require("electron");
 const path = require("path");
 const { startServer } = require("./server");
 
 const binDir = app.isPackaged ? path.join(process.resourcesPath, "bin") : path.join(__dirname, "bin");
-let win, stopAll = () => {};
+let win, browser, stopAll = () => {};
+
+/** In-app YouTube window; the floating button (browse-preload.js) sends the chosen URL back. */
+function openBrowser() {
+  if (browser && !browser.isDestroyed()) { browser.focus(); return; }
+  browser = new BrowserWindow({
+    width: 1100, height: 800, parent: win, title: "YouTube", autoHideMenuBar: true, backgroundColor: "#0f0f0f",
+    webPreferences: { preload: path.join(__dirname, "browse-preload.js"), partition: "persist:youtube", contextIsolation: true, sandbox: true },
+  });
+  // Stay on YouTube (and its sign-in pages); anything else opens in the system browser.
+  const allowed = u => /^https:\/\/([\w-]+\.)*(youtube\.com|youtu\.be|google\.com|gstatic\.com|googleusercontent\.com)(\/|$)/.test(u);
+  browser.webContents.setWindowOpenHandler(({ url }) => { if (/^https:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
+  browser.webContents.on("will-navigate", (e, url) => { if (!allowed(url)) { e.preventDefault(); shell.openExternal(url); } });
+  browser.loadURL("https://www.youtube.com/");
+}
+
+ipcMain.on("nazzil:pick", (e, url) => {
+  if (!browser || e.sender !== browser.webContents || !/^https:\/\//.test(url)) return;
+  win.webContents.executeJavaScript(`window.nazzilSetUrl && window.nazzilSetUrl(${JSON.stringify(String(url))})`);
+  browser.close();
+  win.show(); win.focus();
+});
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -11,6 +32,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   const started = await startServer({
     appVersion: app.getVersion(),
+    browse: () => openBrowser(),
     notify: (title, kind) => {
       if (!Notification.isSupported() || (win && win.isFocused())) return;
       const ar = app.getLocale().startsWith("ar");

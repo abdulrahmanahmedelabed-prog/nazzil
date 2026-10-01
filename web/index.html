@@ -38,6 +38,7 @@
           <input id="url" type="text" inputmode="url" required placeholder="https://youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
           <button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط">×</button>
         </label>
+        <button type="button" id="browseBtn" class="browse-btn"><span class="yt">▶</span><span>تصفّح YouTube واختر الفيديو</span></button>
         <div id="dropzone" class="dropzone" role="button" tabindex="0"><span>اسحب الرابط هنا أو اضغط للصق من الحافظة</span><small>YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها</small><small>يمكنك لصق عدة روابط دفعة واحدة</small></div>
 
         <div id="preview" class="preview" hidden></div>
@@ -76,7 +77,6 @@
           </div>
         </details>
 
-        <label class="consent"><input id="rights" type="checkbox"><span>لدي الحق في تنزيل هذا المحتوى أو أملك إذنًا بذلك.</span></label>
         <button id="submit" class="download-btn"><span>إضافة إلى التنزيلات</span><b>Ctrl ↵</b></button>
       </form>
       <div id="message" class="message" hidden></div>
@@ -109,7 +109,7 @@
     </form>
   </dialog>
 
-  <footer><span>نزّل <span data-no-i18n>3.0</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
+  <footer><span>نزّل <span data-no-i18n>4.1</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
 </div>
 <script src="i18n.js"></script>
 <script src="ytdlp.js"></script>

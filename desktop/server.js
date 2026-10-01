@@ -24,7 +24,7 @@ function lastError(text) {
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "" }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {} }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -137,7 +137,6 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       return summarizeInfo(JSON.parse(r.stdout));
     },
     async download(body) {
-      if (!body.rightsConfirmed) throw new Error("يجب تأكيد امتلاك حق التنزيل.");
       const url = validUrl(body.url);
       if (!url) throw new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://");
       const id = crypto.randomUUID();
@@ -157,6 +156,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       }
       return { ok: true };
     },
+    async browse() { browse(); return { ok: true }; },
     async pause({ id }) {
       const j = jobs.get(id);
       if (j && (j.state === "working" || j.state === "queued")) { j.state = "paused"; j.speed = ""; j.eta = ""; killTree(j.proc); pump(); }

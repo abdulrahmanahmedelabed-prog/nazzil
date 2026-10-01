@@ -39,7 +39,6 @@
     "قص مقطع": "Trim",
     "من 0:00": "From 0:00",
     "إلى 1:30": "To 1:30",
-    "لدي الحق في تنزيل هذا المحتوى أو أملك إذنًا بذلك.": "I own this content or have permission to download it.",
     "إضافة إلى التنزيلات": "Add to downloads",
     "قائمة التنزيل": "Downloads",
     "لا توجد تنزيلات جارية": "No active downloads",
@@ -69,6 +68,7 @@
     "يعمل محليًا على Windows": "Runs locally on Windows",
     "يعمل محليًا على Android": "Runs locally on Android",
     "للمحتوى المصرّح به فقط": "For authorized content only",
+    "تصفّح YouTube واختر الفيديو": "Browse YouTube and pick a video",
     "يمكنك لصق عدة روابط دفعة واحدة": "You can paste several links at once",
     "ابحث في التنزيلات…": "Search downloads…",
     // dynamic
