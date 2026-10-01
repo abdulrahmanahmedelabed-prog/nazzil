@@ -65,6 +65,8 @@ function show(html, error = false) {
   el.innerHTML = html || "";
 }
 const looksLikeUrl = s => /^https?:\/\/\S+\.\S+/i.test((s || "").trim());
+/** All http(s) links in a piece of text, de-duplicated, in order. */
+const extractUrls = text => [...new Set((String(text || "").match(/https?:\/\/[^\s"'<>]+/gi) || []).map(u => u.replace(/[),.;]+$/, "")))];
 
 /* ---------- Preferences ---------- */
 const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "dark", rate: "", cookies: "" }, store.get(PREFS, {}));
@@ -99,6 +101,14 @@ let infoTimer, infoFor = "", lastInfo = null;
 function queueInfo() {
   clearTimeout(infoTimer);
   const url = $("url").value.trim();
+  const urls = extractUrls(url);
+  if (urls.length > 1) {
+    infoFor = url; lastInfo = null;
+    const box = $("preview");
+    box.hidden = false; box.className = "preview";
+    box.innerHTML = `<div class="meta" style="width:100%"><b>${urls.length} ${esc(t("روابط ستُضاف كلها إلى قائمة التنزيل"))}</b><div class="batch">${urls.slice(0, 50).map(u => `<span>${esc(u)}</span>`).join("")}</div></div>`;
+    return;
+  }
   if (!looksLikeUrl(url)) { $("preview").hidden = true; lastInfo = null; infoFor = ""; return; }
   if (url === infoFor) return;
   infoTimer = setTimeout(() => loadInfo(url), 450);
@@ -183,12 +193,16 @@ async function pollJobs() {
 
 /* ---------- History ---------- */
 function saveHistory(item) {
-  const rows = [item, ...store.get(HISTORY, []).filter(x => x.file !== item.file)].slice(0, 30);
+  const rows = [item, ...store.get(HISTORY, []).filter(x => x.file !== item.file)].slice(0, 300);
   store.set(HISTORY, rows);
   renderHistory();
 }
 function renderHistory() {
-  const rows = store.get(HISTORY, []);
+  const all = store.get(HISTORY, []);
+  $("historySearch").hidden = all.length < 6;
+  const q = $("historySearch").value.trim().toLowerCase();
+  const rows = (q ? all.filter(x => String(x.name).toLowerCase().includes(q)) : all).slice(0, 60);
+  if (q && !rows.length) { $("history").innerHTML = `<div class="history-empty">${esc(t("لا نتائج"))}</div>`; return; }
   $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString(NzI18n.lang)}${x.count > 1 ? ` · ${x.count} ${t("ملف")}` : ""}</small></div><a href="#" data-open="${esc(x.file)}" aria-label="${esc(t("فتح الملف"))}">↗</a></div>`).join("")
     : `<div class="history-empty">${esc(t("لا توجد تنزيلات بعد"))}<br><small>${esc(t("ستظهر ملفاتك هنا"))}</small></div>`;
 }
@@ -202,7 +216,8 @@ function parseTime(v) {
 }
 $("form").addEventListener("submit", async e => {
   e.preventDefault();
-  const url = $("url").value.trim();
+  const urls = extractUrls($("url").value);
+  const url = urls[0] || $("url").value.trim();
   if (!looksLikeUrl(url)) { show(esc(t("ألصق رابطًا صحيحًا يبدأ بـ https://")), true); $("url").focus(); return; }
   if (!$("rights").checked) { show(esc(t("أكّد أن لديك الحق في تنزيل هذا المحتوى.")), true); return; }
   savePrefs();
@@ -215,8 +230,13 @@ $("form").addEventListener("submit", async e => {
       from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value),
       title: lastInfo?.title || url, rightsConfirmed: true,
     };
-    await rpc("download", body);
-    show(esc(t("أُضيف إلى قائمة التنزيل ✓")));
+    if (urls.length > 1) {
+      for (const u of urls) await rpc("download", { ...body, url: u, title: u, playlist: false });
+      show(esc(t("أُضيفت الروابط إلى قائمة التنزيل ✓")));
+    } else {
+      await rpc("download", body);
+      show(esc(t("أُضيف إلى قائمة التنزيل ✓")));
+    }
     if (innerWidth < 760) $("queue").scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => show(""), 2500);
     $("url").value = ""; $("trimFrom").value = ""; $("trimTo").value = ""; $("playlist").checked = false;
@@ -237,9 +257,15 @@ document.addEventListener("click", e => {
 });
 
 $("url").addEventListener("input", queueInfo);
-$("url").addEventListener("paste", () => setTimeout(queueInfo, 0));
+$("url").addEventListener("paste", e => {
+  // A single-line input would glue pasted lines together; keep multiple links separated.
+  const urls = extractUrls(e.clipboardData && e.clipboardData.getData("text"));
+  if (urls.length > 1) { e.preventDefault(); $("url").value = urls.join(" "); }
+  setTimeout(queueInfo, 0);
+});
 $("clearUrl").addEventListener("click", () => { $("url").value = ""; queueInfo(); $("url").focus(); });
-$("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); renderHistory(); });
+$("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); $("historySearch").value = ""; renderHistory(); });
+$("historySearch").addEventListener("input", renderHistory);
 document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("change", () => { syncKind(); savePrefs(); }));
 ["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip", "rate", "cookies"].forEach(id => $(id).addEventListener("change", () => {
   savePrefs();
@@ -249,7 +275,8 @@ document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("c
 async function pasteFromClipboard(silent) {
   try {
     const text = (await navigator.clipboard.readText() || "").trim();
-    if (looksLikeUrl(text) && text !== $("url").value.trim()) { $("url").value = text; queueInfo(); if (!silent) show(esc(t("تم لصق الرابط من الحافظة."))); }
+    const urls = extractUrls(text), joined = urls.join(" ");
+    if (urls.length && joined !== $("url").value.trim()) { $("url").value = joined; queueInfo(); if (!silent) show(esc(t("تم لصق الرابط من الحافظة."))); }
   } catch {}
 }
 const drop = $("dropzone");
@@ -257,7 +284,8 @@ const drop = $("dropzone");
 ["dragleave", "drop"].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.remove("drag"); }));
 drop.addEventListener("drop", e => {
   const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text");
-  if (text) { $("url").value = text.split("\n")[0].trim(); queueInfo(); }
+  const urls = extractUrls(text);
+  if (urls.length) { $("url").value = urls.join(" "); queueInfo(); }
 });
 drop.addEventListener("click", () => pasteFromClipboard(false));
 drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pasteFromClipboard(false); } });
@@ -296,14 +324,36 @@ async function loadStatus() {
       $("platform").textContent = t(status.platform === "android" ? "يعمل محليًا على Android" : "يعمل محليًا على Windows");
       $("cookiesRow").hidden = status.platform === "android"; // Android apps can't read browser cookies
       rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
+      checkForUpdate(status.appVersion);
       return;
     } catch { await new Promise(r => setTimeout(r, 700)); }
   }
   $("tools").textContent = t("الخدمة غير متصلة");
 }
 
+/* ---------- App updates ---------- */
+const RELEASES = "https://api.github.com/repos/abdulrahmanahmedelabed-prog/nazzil/releases/latest";
+const newer = (a, b) => {
+  const x = String(a).replace(/^v/, "").split(".").map(Number), y = String(b).replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
+  return false;
+};
+async function checkForUpdate(current) {
+  if (!current) return;
+  try {
+    const r = await fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) return; // e.g. the repository is private
+    const rel = await r.json();
+    if (!newer(rel.tag_name, current)) return;
+    const bar = $("updateBar");
+    bar.href = rel.html_url;
+    bar.textContent = `${t("إصدار جديد متاح")}: ${rel.tag_name} — ${t("اضغط للتحميل")}`;
+    bar.hidden = false;
+  } catch {}
+}
+
 // Android hands us a URL shared from another app.
-window.nazzilSetUrl = url => { $("url").value = url; queueInfo(); show(esc(t("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."))); };
+window.nazzilSetUrl = url => { $("url").value = extractUrls(url).join(" ") || url; queueInfo(); show(esc(t("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."))); };
 
 function applyLang() {
   NzI18n.translatePage();

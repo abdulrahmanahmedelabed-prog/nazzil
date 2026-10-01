@@ -1,6 +1,6 @@
 // Local-only RPC server (127.0.0.1) that drives yt-dlp without a shell.
 const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto");
-const { spawn, execFile } = require("child_process");
+const { spawn, execFile, execFileSync } = require("child_process");
 const { buildArgs, parseLine, summarizeInfo, validUrl } = require("./web/ytdlp.js");
 
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png" };
@@ -24,7 +24,7 @@ function lastError(text) {
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "" }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -42,6 +42,24 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   const ffmpeg = fs.existsSync(path.join(binDir, "ffmpeg" + EXE)) ? path.join(binDir, "ffmpeg" + EXE) : "ffmpeg";
 
   const jobs = new Map();
+  const queueFile = path.join(dataDir, "queue.json");
+
+  // Unfinished downloads survive closing the app: interrupted ones continue, paused ones stay paused.
+  try {
+    for (const j of JSON.parse(fs.readFileSync(queueFile, "utf8"))) {
+      jobs.set(j.id, { ...j, state: j.state === "paused" ? "paused" : "queued", files: j.files || [], speed: "", eta: "" });
+    }
+  } catch {}
+  let saveTimer, shuttingDown = false;
+  function saveQueue() {
+    if (shuttingDown) return; // stopAll already wrote the final queue
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const keep = [...jobs.values()].filter(j => ["queued", "working", "paused"].includes(j.state))
+        .map(({ id, opts, title, state, progress, files }) => ({ id, opts, title, state, progress, files }));
+      fs.writeFile(queueFile, JSON.stringify(keep), () => {});
+    }, 300);
+  }
   let parallel = 3;
 
   function remember(p) {
@@ -49,6 +67,8 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     saveSettings();
   }
   function pump() {
+    saveQueue();
+    if (shuttingDown) return;
     const working = [...jobs.values()].filter(j => j.state === "working").length;
     const next = [...jobs.values()].filter(j => j.state === "queued");
     for (let i = 0; i < Math.min(parallel - working, next.length); i++) start(next[i]);
@@ -81,14 +101,16 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     p.on("close", code => {
       job.proc = null;
       // Paused jobs keep their partial files so resuming continues where it stopped.
-      if (job.state !== "paused") fs.rm(tempDir, { recursive: true, force: true }, () => {});
+      if (job.state !== "paused" && job.state !== "stopping") fs.rm(tempDir, { recursive: true, force: true }, () => {});
       if (job.state === "working") {
         if (code === 0 && job.files.length) {
           const file = job.files.length > 1 ? path.dirname(job.files[0]) : job.files[0];
           Object.assign(job, { state: "done", progress: 100, file, count: job.files.length });
+          notify(job.title, "done");
           remember(file);
         } else {
           Object.assign(job, { state: "error", error: code === 0 ? "لم يُنشأ أي ملف." : lastError(err) });
+          notify(job.title, "error");
         }
       }
       pump();
@@ -105,7 +127,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   const methods = {
     async status() {
       const [v, f] = await Promise.all([run(ytdlp, ["--version"], { timeout: 15000 }), run(ffmpeg, ["-version"], { timeout: 15000 })]);
-      return { yt_dlp: v.ok, ffmpeg: f.ok, version: v.stdout.trim(), folder: settings.folder, canPickFolder: true, platform: "windows" };
+      return { yt_dlp: v.ok, ffmpeg: f.ok, version: v.stdout.trim(), folder: settings.folder, canPickFolder: true, platform: "windows", appVersion };
     },
     async info({ url }) {
       const u = validUrl(url);
@@ -146,7 +168,15 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       if (j && !j.proc && ["paused", "error", "cancelled"].includes(j.state)) { Object.assign(j, { state: "queued", error: "" }); pump(); }
       return { ok: true };
     },
-    async dismiss({ id }) { const j = jobs.get(id); if (j && !j.proc) jobs.delete(id); return { ok: true }; },
+    async dismiss({ id }) {
+      const j = jobs.get(id);
+      if (j && !j.proc) {
+        jobs.delete(id);
+        if (j.state === "paused") fs.rm(path.join(dataDir, "tmp", id), { recursive: true, force: true }, () => {});
+        saveQueue();
+      }
+      return { ok: true };
+    },
     async settings({ parallel: n }) { if (n >= 1 && n <= 5) { parallel = n; pump(); } return { ok: true }; },
     async open({ file }) {
       const target = file ? path.resolve(file) : settings.folder;
@@ -192,7 +222,25 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
     fs.createReadStream(file).pipe(res);
   });
-  return new Promise(resolve => server.listen(0, "127.0.0.1", () => resolve(server.address().port)));
+  // Stop yt-dlp children on quit (Windows doesn't kill them with the parent). Their partial files are kept,
+  // and the queue file still lists them as working, so they resume on next launch.
+  const stopAll = () => {
+    shuttingDown = true;
+    clearTimeout(saveTimer);
+    const keep = [...jobs.values()].filter(j => ["queued", "working", "paused"].includes(j.state))
+      .map(({ id, opts, title, state, progress, files }) => ({ id, opts, title, state, progress, files }));
+    try { fs.writeFileSync(queueFile, JSON.stringify(keep)); } catch {}
+    for (const j of jobs.values()) {
+      if (!j.proc) continue;
+      j.state = "stopping";
+      // Synchronous so the children are gone before the app exits.
+      try {
+        if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(j.proc.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+        else j.proc.kill("SIGTERM");
+      } catch {}
+    }
+  };
+  return new Promise(resolve => server.listen(0, "127.0.0.1", () => { pump(); resolve({ port: server.address().port, stopAll }); }));
 }
 
 module.exports = { startServer };

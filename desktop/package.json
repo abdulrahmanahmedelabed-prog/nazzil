@@ -1,7 +1,7 @@
 {
   "name": "nazzil",
   "productName": "Nazzil",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "نزّل — استوديو الفيديو والصوت",
   "main": "main.js",
   "author": "Nazzil",
@@ -21,7 +21,7 @@
     "files": ["main.js", "server.js", "web/**"],
     "extraResources": [{ "from": "bin", "to": "bin" }],
     "win": { "target": ["nsis", "portable"] },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Nazzil-Setup-${version}.${ext}" },
-    "portable": { "artifactName": "Nazzil-Portable-${version}.${ext}" }
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Nazzil-Setup.${ext}" },
+    "portable": { "artifactName": "Nazzil-Portable.${ext}" }
   }
 }
