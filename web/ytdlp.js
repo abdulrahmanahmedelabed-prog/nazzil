@@ -9,6 +9,8 @@
   const POST = "postprocess:NZS|%(progress.postprocessor)s";
   const HEIGHTS = ["best", "2160", "1440", "1080", "720", "480", "360"];
   const TIME = /^\d+(:\d{1,2}){0,2}(\.\d+)?$/;
+  const RATES = ["500K", "1M", "2M", "5M", "10M"];
+  const BROWSERS = ["chrome", "edge", "firefox", "brave", "opera", "vivaldi"];
 
   function validUrl(raw) {
     try {
@@ -19,7 +21,7 @@
     } catch { return null; }
   }
 
-  /** opts: {url, kind, quality, abr, playlist, meta, subs, sponsor, from, to}; env: {outDir, ffmpeg?, tempDir?} */
+  /** opts: {url, kind, quality, abr, playlist, meta, subs, sponsor, from, to, rate, cookies}; env: {outDir, ffmpeg?, tempDir?} */
   function buildArgs(opts, env) {
     const kind = ["mp3", "m4a", "mp4", "webm"].includes(opts.kind) ? opts.kind : "mp3";
     const q = HEIGHTS.includes(String(opts.quality)) ? String(opts.quality) : "1080";
@@ -50,6 +52,9 @@
     }
     if (opts.subs && !audio) a.push("--write-subs", "--write-auto-subs", "--sub-langs", "ar.*,en.*,-live_chat", "--embed-subs");
     if (opts.sponsor) a.push("--sponsorblock-remove", "sponsor,selfpromo,interaction");
+    if (RATES.includes(opts.rate)) a.push("-r", opts.rate);
+    // Age-restricted / members-only content: reuse the user's own browser session.
+    if (BROWSERS.includes(opts.cookies)) a.push("--cookies-from-browser", opts.cookies);
 
     const from = TIME.test(opts.from || "") ? opts.from : "", to = TIME.test(opts.to || "") ? opts.to : "";
     if (from || to) a.push("--download-sections", `*${from || "0"}-${to || "inf"}`, "--force-keyframes-at-cuts");
