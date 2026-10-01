@@ -66,3 +66,9 @@ body.light .search{background:#fff}
 .browse-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--card2);color:var(--text);font:inherit;font-size:13px;font-weight:800;cursor:pointer}
 .browse-btn:hover{border-color:#ff3b3b}
 .browse-btn .yt{display:grid;place-items:center;width:30px;height:21px;border-radius:6px;background:#ff0033;color:#fff;font-size:10px}
+/* Grid tracks default to min-content; let columns shrink so long titles can't widen the page on phones. */
+.workspace>*,.side>*,.download-panel,.queue,.job,.job-top,.history-item>div{min-width:0}
+.preview b,.preview small,.batch span,.message,.job small span{overflow-wrap:anywhere}
+@media(max-width:760px){.workspace{grid-template-columns:minmax(0,1fr)}.side{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media(max-width:470px){.side{grid-template-columns:minmax(0,1fr)}}
+html,body{overflow-x:hidden}
