@@ -34,6 +34,12 @@ class MainActivity : AppCompatActivity() {
                 override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) =
                     assets.shouldInterceptRequest(request.url)
                 override fun onPageFinished(view: WebView, url: String) { loaded = true; deliverSharedUrl() }
+                // Anything outside the bundled UI (e.g. the release page) opens in the browser.
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    if (request.url.host == "appassets.androidplatform.net") return false
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                    return true
+                }
             }
         }
         setContentView(web)
@@ -54,7 +60,9 @@ class MainActivity : AppCompatActivity() {
     private fun handleShare(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
         val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-        pendingUrl = Regex("https://\\S+").find(text)?.value ?: return
+        // Pass the whole shared text; the page extracts every link from it.
+        if (!text.contains("http")) return
+        pendingUrl = text
         if (loaded) deliverSharedUrl()
     }
 

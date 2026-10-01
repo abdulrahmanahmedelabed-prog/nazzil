@@ -69,5 +69,5 @@ jobs:
           make_latest: true
           files: dist/*
           body: |
-            **Windows:** `Nazzil-Setup-${{ steps.v.outputs.version }}.exe` (مثبّت) أو `Nazzil-Portable-${{ steps.v.outputs.version }}.exe` (بلا تثبيت).
+            **Windows:** `Nazzil-Setup.exe` (مثبّت) أو `Nazzil-Portable.exe` (بلا تثبيت).
             **Android:** `Nazzil-universal.apk`، أو ملف معمارية جهازك (`arm64-v8a` لمعظم الهواتف الحديثة) لحجم أصغر.

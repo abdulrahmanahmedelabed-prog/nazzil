@@ -57,3 +57,9 @@ html[dir=ltr] .advanced summary:after{float:right}
 html[dir=ltr] .format-card mark{left:auto;right:9px}
 html[dir=ltr] .history-item a{margin-right:0;margin-left:auto}
 html[dir=ltr] .set-row small{text-align:left}
+.search{width:100%;margin-top:12px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#0d0f14;color:var(--text);font:inherit;font-size:12px}
+.search:focus{outline:2px solid var(--green)}
+body.light .search{background:#fff}
+.update-bar{display:block;margin-top:16px;padding:11px 15px;border:1px solid var(--green);border-radius:12px;background:#b7f45b12;color:var(--lime);font-size:12px;font-weight:800;text-decoration:none}
+.update-bar[hidden]{display:none}
+.batch{display:grid;gap:4px;font-size:11px;color:var(--muted);direction:ltr;text-align:left;max-height:120px;overflow:auto;width:100%}

@@ -32,6 +32,7 @@ class Bridge(private val activity: MainActivity) {
             JSONObject().put("yt_dlp", Tools.ytdlp).put("ffmpeg", Tools.ffmpeg)
                 .put("version", runCatching { YoutubeDL.getInstance().version(activity) }.getOrNull() ?: "")
                 .put("folder", "Download/Nazzil").put("canPickFolder", false).put("platform", "android")
+                .put("appVersion", runCatching { activity.packageManager.getPackageInfo(activity.packageName, 0).versionName }.getOrNull() ?: "")
         }
         "info" -> {
             waitReady()

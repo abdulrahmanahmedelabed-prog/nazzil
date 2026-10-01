@@ -1,5 +1,8 @@
 package app.nazzil
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -8,6 +11,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.yausername.youtubedl_android.YoutubeDL
@@ -130,9 +134,11 @@ object Downloads {
             if (playlist) saved[key] = uris.first()
             work.deleteRecursively()
             job.set("state" to "done", "progress" to 100, "file" to key, "count" to made.size, "speed" to "", "eta" to "")
+            notifyFinished(job, true)
         } catch (e: Exception) {
             if (!job.stopRequested) {
                 job.set("state" to "error", "error" to friendly(e.message))
+                notifyFinished(job, false)
                 work.deleteRecursively()
             }
         } finally {
@@ -155,6 +161,27 @@ object Downloads {
                 p.getOrNull(5)?.trim()?.toIntOrNull()?.let { job.set("items" to it) }
             }
             t.startsWith("NZS|") -> job.set("stage" to "post", "speed" to "", "eta" to "")
+        }
+    }
+
+    /** One notification per finished job, so the user knows even when the app is in the background. */
+    private fun notifyFinished(job: Job, ok: Boolean) {
+        runCatching {
+            val nm = app.getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                nm.createNotificationChannel(NotificationChannel("finished", "اكتمال التنزيل", NotificationManager.IMPORTANCE_DEFAULT))
+            }
+            val ar = java.util.Locale.getDefault().language == "ar"
+            val open = PendingIntent.getActivity(app, 0, Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val n = NotificationCompat.Builder(app, "finished")
+                .setSmallIcon(if (ok) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
+                .setContentTitle(if (ok) (if (ar) "اكتمل التنزيل" else "Download complete") else (if (ar) "فشل التنزيل" else "Download failed"))
+                .setContentText(job.title)
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .build()
+            nm.notify(job.id.hashCode(), n)
         }
     }
 

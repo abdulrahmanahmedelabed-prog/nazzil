@@ -19,6 +19,8 @@
     </div>
   </header>
 
+  <a id="updateBar" class="update-bar" hidden target="_blank" rel="noopener"></a>
+
   <section class="welcome">
     <div>
       <p class="tag">مساحة التحويل الخاصة بك</p>
@@ -33,10 +35,10 @@
       <div class="panel-head"><div><span class="step">01</span><h2>أضف الرابط</h2></div><span id="tools" class="tools">فحص الأدوات…</span></div>
       <form id="form" novalidate>
         <label class="url-label">رابط الفيديو أو قائمة التشغيل
-          <input id="url" type="url" required placeholder="https://youtube.com/watch?v=…" autocomplete="off">
+          <input id="url" type="text" inputmode="url" required placeholder="https://youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
           <button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط">×</button>
         </label>
-        <div id="dropzone" class="dropzone" role="button" tabindex="0"><span>اسحب الرابط هنا أو اضغط للصق من الحافظة</span><small>YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها</small></div>
+        <div id="dropzone" class="dropzone" role="button" tabindex="0"><span>اسحب الرابط هنا أو اضغط للصق من الحافظة</span><small>YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها</small><small>يمكنك لصق عدة روابط دفعة واحدة</small></div>
 
         <div id="preview" class="preview" hidden></div>
 
@@ -87,6 +89,7 @@
       </section>
       <section class="side-card">
         <div class="side-title"><h3>نشاطك الأخير</h3><button id="clearHistory" class="text-btn">مسح الكل</button></div>
+        <input id="historySearch" class="search" type="search" placeholder="ابحث في التنزيلات…" hidden>
         <div id="history" class="history"></div>
       </section>
       <section class="side-card privacy"><div class="privacy-icon">✓</div><div><h3>خصوصيتك أولاً</h3><p>المعالجة تتم على جهازك. لا حسابات، لا تتبع، لا إعلانات.</p></div></section>
