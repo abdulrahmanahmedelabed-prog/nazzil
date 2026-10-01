@@ -48,3 +48,12 @@ select:focus,.trim input:focus{outline:2px solid var(--green)}
 body.light .url-label input,body.light select,body.light .trim input,body.light .preview{background:#fff}
 @media(max-width:1000px){.formats{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.shell{padding:20px 15px}.welcome{padding:52px 0 35px}.orbit{width:120px;height:120px;flex:none}.orbit:before{inset:15px}.orbit:after{inset:34px}.orbit span{font-size:7px;padding:4px}.orbit span:first-child{top:2px;right:27px}.orbit span:nth-child(2){bottom:12px;left:2px}.orbit span:last-child{bottom:25px;right:0}.workspace{grid-template-columns:1fr}.side{grid-template-columns:1fr 1fr}.privacy{grid-column:span 2}.download-panel{padding:22px}.download-btn b{display:none}.welcome h1{font-size:42px}}@media(max-width:470px){.welcome{display:block}.orbit{display:none}.side{grid-template-columns:1fr}.preview img{width:96px}.row{grid-template-columns:1fr}.privacy{grid-column:auto}footer{gap:10px;flex-wrap:wrap}}
+.lang-btn{font-size:12px;font-weight:900;border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+.job-actions{display:flex;gap:2px}
+.job.paused .bar i{background:var(--muted)}
+html[dir=ltr] .clear{left:auto;right:12px}
+html[dir=ltr] .url-label input{padding:17px 46px 17px 17px}
+html[dir=ltr] .advanced summary:after{float:right}
+html[dir=ltr] .format-card mark{left:auto;right:9px}
+html[dir=ltr] .history-item a{margin-right:0;margin-left:auto}
+html[dir=ltr] .set-row small{text-align:left}

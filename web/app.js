@@ -1,5 +1,6 @@
 "use strict";
 const $ = id => document.getElementById(id);
+const t = NzI18n.t;
 const HISTORY = "nazil.history.v1", PREFS = "nazil.prefs.v2";
 
 /* ---------- Platform bridge ----------
@@ -63,15 +64,15 @@ function show(html, error = false) {
   el.className = "message" + (error ? " error" : "");
   el.innerHTML = html || "";
 }
-const looksLikeUrl = t => /^https?:\/\/\S+\.\S+/i.test((t || "").trim());
+const looksLikeUrl = s => /^https?:\/\/\S+\.\S+/i.test((s || "").trim());
 
 /* ---------- Preferences ---------- */
-const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "dark" }, store.get(PREFS, {}));
+const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "dark", rate: "", cookies: "" }, store.get(PREFS, {}));
 function savePrefs() {
   Object.assign(prefs, {
     kind: new FormData($("form")).get("kind"), quality: $("quality").value, abr: $("abr").value,
     meta: $("meta").checked, subs: $("subs").checked, sponsor: $("sponsor").checked,
-    parallel: $("parallel").value, autoClip: $("autoClip").checked,
+    parallel: $("parallel").value, autoClip: $("autoClip").checked, rate: $("rate").value, cookies: $("cookies").value,
   });
   store.set(PREFS, prefs);
 }
@@ -81,6 +82,7 @@ function applyPrefs() {
   $("quality").value = prefs.quality; $("abr").value = prefs.abr;
   $("meta").checked = prefs.meta; $("subs").checked = prefs.subs; $("sponsor").checked = prefs.sponsor;
   $("parallel").value = prefs.parallel; $("autoClip").checked = prefs.autoClip;
+  $("rate").value = prefs.rate; $("cookies").value = prefs.cookies;
   if (prefs.theme === "light") document.body.classList.add("light");
   syncKind();
 }
@@ -106,19 +108,19 @@ async function loadInfo(url) {
   const box = $("preview");
   box.hidden = false;
   box.className = "preview loading";
-  box.innerHTML = '<div class="spin"></div> جارٍ جلب المعلومات…';
+  box.innerHTML = `<div class="spin"></div> ${esc(t("جارٍ جلب المعلومات…"))}`;
   try {
     const i = await rpc("info", { url });
     if (url !== infoFor) return;
     lastInfo = i;
     box.className = "preview";
     const chips = [
-      i.playlist ? `قائمة · ${i.count || "?"} مقطع` : "",
+      i.playlist ? `${t("قائمة")} · ${i.count || "?"} ${t("مقطع")}` : "",
       i.duration ? fmtDur(i.duration) : "",
       i.height ? (i.height >= 2160 ? "4K" : i.height + "p") : "",
       i.site || "",
     ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join("");
-    box.innerHTML = `${i.thumbnail ? `<img src="${esc(i.thumbnail)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<div class="meta"><b>${esc(i.title || "بدون عنوان")}</b><small>${esc(i.uploader || "")}</small><div class="chips">${chips}</div></div>`;
+    box.innerHTML = `${i.thumbnail ? `<img src="${esc(i.thumbnail)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<div class="meta"><b>${esc(i.title || t("بدون عنوان"))}</b><small>${esc(i.uploader || "")}</small><div class="chips">${chips}</div></div>`;
     if (i.playlist) $("playlist").checked = true;
     if (i.height) {
       // Hide resolutions the source doesn't have.
@@ -129,7 +131,7 @@ async function loadInfo(url) {
     if (url !== infoFor) return;
     lastInfo = null;
     box.className = "preview loading";
-    box.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+    box.innerHTML = `<span style="color:var(--bad)">${esc(t(e.message))}</span>`;
   }
 }
 
@@ -139,19 +141,24 @@ const seen = new Set(JSON.parse(sessionStorage.getItem("nz.seen") || "[]"));
 function renderJobs(jobs) {
   const box = $("queue");
   const active = jobs.filter(j => j.state === "queued" || j.state === "working").length;
-  $("queueCount").textContent = active ? `· ${active} جارٍ` : "";
-  if (!jobs.length) { box.innerHTML = '<div class="history-empty">لا توجد تنزيلات جارية</div>'; return; }
+  $("queueCount").textContent = active ? `· ${active} ${t("جارٍ")}` : "";
+  if (!jobs.length) { box.innerHTML = `<div class="history-empty">${esc(t("لا توجد تنزيلات جارية"))}</div>`; return; }
   box.innerHTML = jobs.map(j => {
     const pct = Math.max(0, Math.min(100, j.progress || 0));
     let line;
-    if (j.state === "queued") line = `<span>في الانتظار…</span>`;
-    else if (j.state === "working") line = `<span>${j.stage === "post" ? "جارٍ التحويل…" : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
-    else if (j.state === "done") line = `<span>اكتمل${j.count > 1 ? ` · ${j.count} ملف` : ""}</span><a href="#" data-open="${esc(j.file || "")}">${j.count > 1 ? "فتح المجلد" : "فتح"}</a>`;
-    else if (j.state === "cancelled") line = `<span>أُلغي</span>`;
-    else line = `<span>${esc(j.error || "تعذر إكمال العملية")}</span>`;
-    const btn = (j.state === "queued" || j.state === "working")
-      ? `<button data-cancel="${esc(j.id)}" title="إلغاء" aria-label="إلغاء">✕</button>`
-      : `<button data-dismiss="${esc(j.id)}" title="إخفاء" aria-label="إخفاء">–</button>`;
+    if (j.state === "queued") line = `<span>${t("في الانتظار…")}</span>`;
+    else if (j.state === "working") line = `<span>${j.stage === "post" ? t("جارٍ التحويل…") : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
+    else if (j.state === "paused") line = `<span>${t("متوقف مؤقتًا")} · ${pct.toFixed(0)}%</span>`;
+    else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}</span><a href="#" data-open="${esc(j.file || "")}">${t(j.count > 1 ? "فتح المجلد" : "فتح")}</a>`;
+    else if (j.state === "cancelled") line = `<span>${t("أُلغي")}</span>`;
+    else line = `<span>${esc(t(j.error || "تعذر إكمال العملية"))}</span>`;
+    const b = (act, icon, label) => `<button data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon}</button>`;
+    const active = j.state === "queued" || j.state === "working";
+    const btn = '<span class="job-actions">' + (
+      active ? b("pause", "⏸", "إيقاف مؤقت") + b("cancel", "✕", "إلغاء")
+      : j.state === "paused" ? b("resume", "▶", "استئناف") + b("cancel", "✕", "إلغاء")
+      : j.state === "done" ? b("dismiss", "–", "إخفاء")
+      : b("resume", "↻", "إعادة المحاولة") + b("dismiss", "–", "إخفاء")) + "</span>";
     return `<div class="job ${esc(j.state)}"><div class="job-top"><span class="file-icon">${esc(j.kind.toUpperCase())}</span><strong title="${esc(j.title)}">${esc(j.title)}</strong>${btn}</div><div class="bar"><i style="width:${j.state === "done" ? 100 : pct}%"></i></div><small>${line}</small></div>`;
   }).join("");
 }
@@ -182,40 +189,41 @@ function saveHistory(item) {
 }
 function renderHistory() {
   const rows = store.get(HISTORY, []);
-  $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString("ar")}${x.count > 1 ? ` · ${x.count} ملف` : ""}</small></div><a href="#" data-open="${esc(x.file)}" aria-label="فتح الملف">↗</a></div>`).join("")
-    : '<div class="history-empty">لا توجد تنزيلات بعد<br><small>ستظهر ملفاتك هنا</small></div>';
+  $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString(NzI18n.lang)}${x.count > 1 ? ` · ${x.count} ${t("ملف")}` : ""}</small></div><a href="#" data-open="${esc(x.file)}" aria-label="${esc(t("فتح الملف"))}">↗</a></div>`).join("")
+    : `<div class="history-empty">${esc(t("لا توجد تنزيلات بعد"))}<br><small>${esc(t("ستظهر ملفاتك هنا"))}</small></div>`;
 }
 
 /* ---------- Actions ---------- */
-function parseTime(t) {
-  t = (t || "").trim();
-  if (!t) return "";
-  if (!/^\d+(:\d{1,2}){0,2}(\.\d+)?$/.test(t)) throw new Error("صيغة وقت القص غير صحيحة. مثال: 1:30");
-  return t;
+function parseTime(v) {
+  v = (v || "").trim();
+  if (!v) return "";
+  if (!/^\d+(:\d{1,2}){0,2}(\.\d+)?$/.test(v)) throw new Error(t("صيغة وقت القص غير صحيحة. مثال: 1:30"));
+  return v;
 }
 $("form").addEventListener("submit", async e => {
   e.preventDefault();
   const url = $("url").value.trim();
-  if (!looksLikeUrl(url)) { show("ألصق رابطًا صحيحًا يبدأ بـ https://", true); $("url").focus(); return; }
-  if (!$("rights").checked) { show("أكّد أن لديك الحق في تنزيل هذا المحتوى.", true); return; }
+  if (!looksLikeUrl(url)) { show(esc(t("ألصق رابطًا صحيحًا يبدأ بـ https://")), true); $("url").focus(); return; }
+  if (!$("rights").checked) { show(esc(t("أكّد أن لديك الحق في تنزيل هذا المحتوى.")), true); return; }
   savePrefs();
   $("submit").disabled = true;
   try {
     const body = {
       url, kind: prefs.kind, quality: prefs.quality, abr: prefs.abr,
       playlist: $("playlist").checked, meta: prefs.meta, subs: prefs.subs, sponsor: prefs.sponsor,
+      rate: prefs.rate, cookies: status.platform === "android" ? "" : prefs.cookies,
       from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value),
       title: lastInfo?.title || url, rightsConfirmed: true,
     };
     await rpc("download", body);
-    show("أُضيف إلى قائمة التنزيل ✓");
+    show(esc(t("أُضيف إلى قائمة التنزيل ✓")));
     if (innerWidth < 760) $("queue").scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => show(""), 2500);
     $("url").value = ""; $("trimFrom").value = ""; $("trimTo").value = ""; $("playlist").checked = false;
     $("preview").hidden = true; infoFor = ""; lastInfo = null;
     pollJobs();
   } catch (err) {
-    show(esc(err.message), true);
+    show(esc(t(err.message)), true);
   } finally {
     $("submit").disabled = false;
   }
@@ -223,11 +231,9 @@ $("form").addEventListener("submit", async e => {
 
 document.addEventListener("click", e => {
   const open = e.target.closest("[data-open]");
-  if (open) { e.preventDefault(); rpc("open", { file: open.dataset.open }).catch(err => show(esc(err.message), true)); return; }
-  const cancel = e.target.closest("[data-cancel]");
-  if (cancel) { rpc("cancel", { id: cancel.dataset.cancel }).then(pollJobs); return; }
-  const dismiss = e.target.closest("[data-dismiss]");
-  if (dismiss) rpc("dismiss", { id: dismiss.dataset.dismiss }).then(pollJobs);
+  if (open) { e.preventDefault(); rpc("open", { file: open.dataset.open }).catch(err => show(esc(t(err.message)), true)); return; }
+  const act = e.target.closest("[data-act]");
+  if (act) rpc(act.dataset.act, { id: act.dataset.id }).then(pollJobs, err => show(esc(t(err.message)), true));
 });
 
 $("url").addEventListener("input", queueInfo);
@@ -235,7 +241,7 @@ $("url").addEventListener("paste", () => setTimeout(queueInfo, 0));
 $("clearUrl").addEventListener("click", () => { $("url").value = ""; queueInfo(); $("url").focus(); });
 $("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); renderHistory(); });
 document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("change", () => { syncKind(); savePrefs(); }));
-["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip"].forEach(id => $(id).addEventListener("change", () => {
+["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip", "rate", "cookies"].forEach(id => $(id).addEventListener("change", () => {
   savePrefs();
   if (id === "parallel") rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
 }));
@@ -243,7 +249,7 @@ document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("c
 async function pasteFromClipboard(silent) {
   try {
     const text = (await navigator.clipboard.readText() || "").trim();
-    if (looksLikeUrl(text) && text !== $("url").value.trim()) { $("url").value = text; queueInfo(); if (!silent) show("تم لصق الرابط من الحافظة."); }
+    if (looksLikeUrl(text) && text !== $("url").value.trim()) { $("url").value = text; queueInfo(); if (!silent) show(esc(t("تم لصق الرابط من الحافظة."))); }
   } catch {}
 }
 const drop = $("dropzone");
@@ -268,15 +274,15 @@ document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.ke
 let status = {};
 $("settingsBtn").addEventListener("click", () => $("settings").showModal());
 $("pickFolder").addEventListener("click", async () => {
-  try { const r = await rpc("pickFolder"); if (r.folder) $("folderPath").textContent = r.folder; } catch (e) { show(esc(e.message), true); }
+  try { const r = await rpc("pickFolder"); if (r.folder) $("folderPath").textContent = r.folder; } catch (e) { show(esc(t(e.message)), true); }
 });
 $("openFolder").addEventListener("click", () => rpc("open", { file: "" }).catch(() => {}));
 $("updateBtn").addEventListener("click", async () => {
   const b = $("updateBtn");
-  b.disabled = true; b.textContent = "جارٍ التحديث…";
-  try { const r = await rpc("update"); $("engineVer").textContent = `yt-dlp ${r.version || ""}`; b.textContent = "مُحدَّث ✓"; }
-  catch (e) { b.textContent = "فشل"; show(esc(e.message), true); }
-  finally { setTimeout(() => { b.disabled = false; b.textContent = "تحديث"; }, 2500); }
+  b.disabled = true; b.textContent = t("جارٍ التحديث…");
+  try { const r = await rpc("update"); $("engineVer").textContent = `yt-dlp ${r.version || ""}`; b.textContent = t("مُحدَّث ✓"); }
+  catch (e) { b.textContent = t("فشل"); show(esc(t(e.message)), true); }
+  finally { setTimeout(() => { b.disabled = false; b.textContent = t("تحديث"); }, 2500); }
 });
 
 async function loadStatus() {
@@ -287,18 +293,27 @@ async function loadStatus() {
       $("engineVer").textContent = `yt-dlp ${status.version || ""}`;
       $("folderPath").textContent = status.folder || "—";
       $("pickFolder").hidden = !status.canPickFolder;
-      $("platform").textContent = status.platform === "android" ? "يعمل محليًا على Android" : "يعمل محليًا على Windows";
+      $("platform").textContent = t(status.platform === "android" ? "يعمل محليًا على Android" : "يعمل محليًا على Windows");
+      $("cookiesRow").hidden = status.platform === "android"; // Android apps can't read browser cookies
       rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
       return;
     } catch { await new Promise(r => setTimeout(r, 700)); }
   }
-  $("tools").textContent = "الخدمة غير متصلة";
+  $("tools").textContent = t("الخدمة غير متصلة");
 }
 
 // Android hands us a URL shared from another app.
-window.nazzilSetUrl = url => { $("url").value = url; queueInfo(); show("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."); };
+window.nazzilSetUrl = url => { $("url").value = url; queueInfo(); show(esc(t("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."))); };
+
+function applyLang() {
+  NzI18n.translatePage();
+  $("langBtn").textContent = NzI18n.lang === "en" ? "ع" : "EN";
+  if (status.platform) $("platform").textContent = t(status.platform === "android" ? "يعمل محليًا على Android" : "يعمل محليًا على Windows");
+  renderHistory();
+  pollJobs();
+}
+$("langBtn").addEventListener("click", () => { NzI18n.set(NzI18n.lang === "en" ? "ar" : "en"); applyLang(); });
 
 applyPrefs();
-renderHistory();
+applyLang();
 loadStatus().then(() => { if (prefs.autoClip) pasteFromClipboard(true); });
-pollJobs();

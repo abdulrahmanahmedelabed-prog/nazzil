@@ -9,6 +9,7 @@ import java.util.concurrent.Executors
 class NazzilApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        Downloads.init(this)
         Tools.init(this)
     }
 }

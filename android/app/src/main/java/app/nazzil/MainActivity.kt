@@ -58,6 +58,13 @@ class MainActivity : AppCompatActivity() {
         if (loaded) deliverSharedUrl()
     }
 
+    /** Android 13+ needs permission to show the download progress notification. */
+    fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            runOnUiThread { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2) }
+        }
+    }
+
     /** Delivers an RPC result back to the page. */
     fun reply(id: Int, json: String) = runOnUiThread {
         web.evaluateJavascript("window.__nzReply($id, ${JSONObject.quote(json)})", null)

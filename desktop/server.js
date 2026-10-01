@@ -18,6 +18,8 @@ function lastError(text) {
   if (/Unsupported URL/i.test(line)) return "هذا الموقع أو الرابط غير مدعوم.";
   if (/Private video|Sign in|login/i.test(line)) return "المحتوى خاص أو يتطلب تسجيل الدخول.";
   if (/not available|unavailable|removed/i.test(line)) return "المقطع غير متاح.";
+  if (/HTTP Error 404|Not Found/i.test(line)) return "الرابط غير موجود. تأكد منه وحاول مجددًا.";
+  if (/Unable to download webpage|Failed to resolve|timed out|Connection/i.test(line)) return "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.";
   if (/HTTP Error 403|Forbidden/i.test(line)) return "رفض الموقع الطلب. جرّب تحديث محرك التنزيل من الإعدادات.";
   return msg || "تعذر إكمال العملية.";
 }
@@ -78,7 +80,8 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     p.on("error", e => Object.assign(job, { state: "error", error: "تعذر تشغيل yt-dlp: " + e.message }));
     p.on("close", code => {
       job.proc = null;
-      fs.rm(tempDir, { recursive: true, force: true }, () => {});
+      // Paused jobs keep their partial files so resuming continues where it stopped.
+      if (job.state !== "paused") fs.rm(tempDir, { recursive: true, force: true }, () => {});
       if (job.state === "working") {
         if (code === 0 && job.files.length) {
           const file = job.files.length > 1 ? path.dirname(job.files[0]) : job.files[0];
@@ -123,7 +126,24 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     async jobs() { return { jobs: [...jobs.values()].reverse().map(publicJob) }; },
     async cancel({ id }) {
       const j = jobs.get(id);
-      if (j && (j.state === "working" || j.state === "queued")) { j.state = "cancelled"; killTree(j.proc); pump(); }
+      if (j && ["working", "queued", "paused"].includes(j.state)) {
+        const wasPaused = j.state === "paused";
+        j.state = "cancelled";
+        killTree(j.proc);
+        if (wasPaused) fs.rm(path.join(dataDir, "tmp", j.id), { recursive: true, force: true }, () => {});
+        pump();
+      }
+      return { ok: true };
+    },
+    async pause({ id }) {
+      const j = jobs.get(id);
+      if (j && (j.state === "working" || j.state === "queued")) { j.state = "paused"; j.speed = ""; j.eta = ""; killTree(j.proc); pump(); }
+      return { ok: true };
+    },
+    // Resume a paused job or retry a failed/cancelled one.
+    async resume({ id }) {
+      const j = jobs.get(id);
+      if (j && !j.proc && ["paused", "error", "cancelled"].includes(j.state)) { Object.assign(j, { state: "queued", error: "" }); pump(); }
       return { ok: true };
     },
     async dismiss({ id }) { const j = jobs.get(id); if (j && !j.proc) jobs.delete(id); return { ok: true }; },

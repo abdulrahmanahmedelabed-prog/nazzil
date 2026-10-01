@@ -1,0 +1,199 @@
+package app.nazzil
+
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+
+/**
+ * Download queue that lives in the Application, not the Activity, so downloads survive
+ * leaving the app. DownloadService keeps the process in the foreground while work is active.
+ */
+object Downloads {
+    class Job(val id: String, val kind: String, val title: String, val args: List<String>) {
+        val info: JSONObject = JSONObject().put("id", id).put("kind", kind).put("title", title).put("state", "queued").put("progress", 0)
+        @Volatile var stopRequested = false
+        fun state(): String = synchronized(info) { info.optString("state") }
+        fun set(vararg kv: Pair<String, Any?>) = synchronized(info) { kv.forEach { (k, v) -> info.put(k, v) } }
+    }
+
+    private lateinit var app: Context
+    private val jobs = ConcurrentHashMap<String, Job>()
+    private val order = ConcurrentLinkedQueue<String>()
+    val saved = ConcurrentHashMap<String, Uri>()
+    @Volatile var parallel = 3
+
+    fun init(context: Context) { app = context.applicationContext }
+
+    private fun workDir(id: String) = File(app.cacheDir, "jobs/$id")
+
+    fun add(kind: String, title: String, args: List<String>): String {
+        val id = UUID.randomUUID().toString()
+        jobs[id] = Job(id, kind, title.take(200), args)
+        order.add(id)
+        pump()
+        return id
+    }
+
+    fun list(): JSONArray = JSONArray().apply {
+        order.reversed().forEach { id -> jobs[id]?.let { put(synchronized(it.info) { JSONObject(it.info.toString()) }) } }
+    }
+
+    fun activeCount() = jobs.values.count { it.state() == "working" || it.state() == "queued" }
+
+    /** Average progress of active jobs, for the notification. */
+    fun activeProgress(): Int {
+        val active = jobs.values.filter { it.state() == "working" }
+        if (active.isEmpty()) return 0
+        return active.sumOf { synchronized(it.info) { it.info.optDouble("progress", 0.0) } }.div(active.size).toInt()
+    }
+
+    fun pause(id: String) = stop(id, "paused")
+    fun cancel(id: String) {
+        val j = jobs[id] ?: return
+        val wasPaused = j.state() == "paused"
+        stop(id, "cancelled")
+        if (wasPaused) workDir(id).deleteRecursively()
+    }
+
+    private fun stop(id: String, newState: String) {
+        val j = jobs[id] ?: return
+        if (j.state() !in listOf("queued", "working", "paused")) return
+        j.stopRequested = true
+        j.set("state" to newState, "speed" to "", "eta" to "")
+        runCatching { YoutubeDL.getInstance().destroyProcessById(id) }
+        pump()
+    }
+
+    /** Resume a paused job, or retry a failed/cancelled one. */
+    fun resume(id: String) {
+        val j = jobs[id] ?: return
+        if (j.state() !in listOf("paused", "error", "cancelled")) return
+        j.stopRequested = false
+        j.set("state" to "queued", "error" to "")
+        pump()
+    }
+
+    fun dismiss(id: String) {
+        val j = jobs[id] ?: return
+        if (j.state() in listOf("queued", "working")) return
+        jobs.remove(id); order.remove(id)
+        if (j.state() == "paused") workDir(id).deleteRecursively()
+    }
+
+    @Synchronized fun pump() {
+        val working = jobs.values.count { it.state() == "working" }
+        order.mapNotNull { jobs[it] }.filter { it.state() == "queued" }.take(maxOf(0, parallel - working)).forEach { j ->
+            j.set("state" to "working")
+            Tools.io.execute { run(j) }
+        }
+        if (activeCount() > 0) {
+            runCatching { ContextCompat.startForegroundService(app, Intent(app, DownloadService::class.java)) }
+        }
+    }
+
+    private fun run(job: Job) {
+        val work = workDir(job.id).apply { mkdirs() }
+        try {
+            while (!Tools.ready) Thread.sleep(200)
+            if (!Tools.ytdlp) throw Exception("تعذر تهيئة yt-dlp على هذا الجهاز.")
+            val args = job.args.map { if (it == "__OUT__") work.absolutePath else it }
+            val sep = args.indexOf("--")
+            val req = YoutubeDLRequest(args.drop(sep + 1)).apply { addCommands(args.take(sep)) }
+            try {
+                YoutubeDL.getInstance().execute(req, job.id) { _, _, line -> onLine(job, line) }
+            } catch (e: Exception) {
+                if (job.stopRequested) return
+                throw e
+            }
+            if (job.stopRequested) return
+            val made = work.walkTopDown().filter { it.isFile && !it.name.endsWith(".part") && !it.name.endsWith(".ytdl") }.toList()
+            if (made.isEmpty()) throw Exception("لم يُنشأ أي ملف.")
+            val playlist = made.size > 1
+            val base = if (playlist) (made.first().parentFile?.name ?: "Nazzil") else ""
+            val uris = made.map { f -> publish(f, base).also { saved[f.name] = it } }
+            val key = if (playlist) "folder:$base" else made.first().name
+            if (playlist) saved[key] = uris.first()
+            work.deleteRecursively()
+            job.set("state" to "done", "progress" to 100, "file" to key, "count" to made.size, "speed" to "", "eta" to "")
+        } catch (e: Exception) {
+            if (!job.stopRequested) {
+                job.set("state" to "error", "error" to friendly(e.message))
+                work.deleteRecursively()
+            }
+        } finally {
+            pump()
+        }
+    }
+
+    private fun onLine(job: Job, line: String) {
+        val t = line.trim()
+        if (job.state() != "working") return
+        when {
+            t.startsWith("NZP|") -> {
+                val p = t.split("|")
+                fun clean(s: String?) = s?.trim()?.takeUnless { it == "NA" || it == "None" || it.startsWith("Unknown") } ?: ""
+                job.set("stage" to "download",
+                    "progress" to (p.getOrNull(1)?.trim()?.removeSuffix("%")?.toDoubleOrNull() ?: 0.0),
+                    "speed" to clean(p.getOrNull(2)).replace("iB", "B"),
+                    "eta" to clean(p.getOrNull(3)).removePrefix("00:"))
+                p.getOrNull(4)?.trim()?.toIntOrNull()?.let { job.set("item" to it) }
+                p.getOrNull(5)?.trim()?.toIntOrNull()?.let { job.set("items" to it) }
+            }
+            t.startsWith("NZS|") -> job.set("stage" to "post", "speed" to "", "eta" to "")
+        }
+    }
+
+    fun friendly(msg: String?): String {
+        val line = msg?.lines()?.lastOrNull { it.contains("ERROR") } ?: msg ?: ""
+        return when {
+            Regex("Unsupported URL", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "هذا الموقع أو الرابط غير مدعوم."
+            Regex("Private video|Sign in|login", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "المحتوى خاص أو يتطلب تسجيل الدخول."
+            Regex("unavailable|not available|removed", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "المقطع غير متاح."
+            Regex("HTTP Error 404|Not Found", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "الرابط غير موجود. تأكد منه وحاول مجددًا."
+            Regex("Unable to download webpage|Failed to resolve|timed out|Connection", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة."
+            Regex("403|Forbidden").containsMatchIn(line) -> "رفض الموقع الطلب. جرّب تحديث محرك التنزيل من الإعدادات."
+            line.isNotBlank() -> line.substringAfter("ERROR:").trim()
+            else -> "تعذر إكمال العملية."
+        }
+    }
+
+    /** Copies a finished file to the public Downloads/Nazzil[/sub] folder. */
+    private fun publish(file: File, sub: String): Uri {
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+        val rel = Environment.DIRECTORY_DOWNLOADS + "/Nazzil" + (if (sub.isNotEmpty()) "/" + sub.replace(Regex("[\\\\/:*?\"<>|]"), "_") else "")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = app.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, file.name)
+                put(MediaStore.Downloads.MIME_TYPE, mime)
+                put(MediaStore.Downloads.RELATIVE_PATH, rel)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw Exception("تعذر الحفظ في التنزيلات.")
+            resolver.openOutputStream(uri)!!.use { o -> file.inputStream().use { it.copyTo(o) } }
+            values.clear(); values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return uri
+        }
+        @Suppress("DEPRECATION")
+        val dir = File(Environment.getExternalStorageDirectory(), rel).apply { mkdirs() }
+        val dest = File(dir, file.name)
+        file.copyTo(dest, overwrite = true)
+        return FileProvider.getUriForFile(app, "app.nazzil.files", dest)
+    }
+}
