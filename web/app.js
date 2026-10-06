@@ -23,7 +23,8 @@ function rpc(method, args = {}) {
     if (method === "download") {
       const url = NzYtdlp.validUrl(args.url);
       if (!url) return Promise.reject(new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://"));
-      args = { ...args, url, args: NzYtdlp.buildArgs({ ...args, url }, { outDir: "__OUT__" }) };
+      // "__COOKIES__" is replaced natively with the in-app browser's sign-ins (or dropped if there are none).
+      args = { ...args, url, args: NzYtdlp.buildArgs({ ...args, url }, { outDir: "__OUT__", cookiesFile: "__COOKIES__" }) };
       // Cover from a video frame or the user's image: native code runs these steps after the download.
       if (NzYtdlp.needsCover(args)) {
         const c = NzYtdlp.coverArgs, sec = NzYtdlp.toSeconds(args.coverAt) || 30;
@@ -79,12 +80,12 @@ const looksLikeUrl = s => /^https?:\/\/\S+\.\S+/i.test((s || "").trim());
 const extractUrls = text => [...new Set((String(text || "").match(/https?:\/\/[^\s"'<>]+/gi) || []).map(u => u.replace(/[),.;]+$/, "")))];
 
 /* ---------- Preferences ---------- */
-const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "dark", rate: "", cookies: "", cover: "thumb", coverAt: "", coverImage: "", coverName: "" }, store.get(PREFS, {}));
+const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "", rate: "", cookies: "", cover: "thumb", coverAt: "", coverImage: "", coverName: "", useLogin: true }, store.get(PREFS, {}));
 function savePrefs() {
   Object.assign(prefs, {
     kind: new FormData($("form")).get("kind"), quality: $("quality").value, abr: $("abr").value,
     meta: $("meta").checked, subs: $("subs").checked, sponsor: $("sponsor").checked,
-    parallel: $("parallel").value, autoClip: $("autoClip").checked, rate: $("rate").value, cookies: $("cookies").value,
+    parallel: $("parallel").value, autoClip: $("autoClip").checked, rate: $("rate").value, cookies: $("cookies").value, useLogin: $("useLogin").checked,
     cover: (document.querySelector("input[name=cover]:checked") || {}).value || "thumb", coverAt: $("coverAt").value.trim(),
   });
   store.set(PREFS, prefs);
@@ -95,11 +96,13 @@ function applyPrefs() {
   $("quality").value = prefs.quality; $("abr").value = prefs.abr;
   $("meta").checked = prefs.meta; $("subs").checked = prefs.subs; $("sponsor").checked = prefs.sponsor;
   $("parallel").value = prefs.parallel; $("autoClip").checked = prefs.autoClip;
-  $("rate").value = prefs.rate; $("cookies").value = prefs.cookies;
+  $("rate").value = prefs.rate; $("cookies").value = prefs.cookies; $("useLogin").checked = prefs.useLogin;
   const c = document.querySelector(`input[name=cover][value="${prefs.cover}"]`);
   if (c) c.checked = true;
   $("coverAt").value = prefs.coverAt; $("coverName").textContent = prefs.coverName || "";
-  if (prefs.theme === "light") document.body.classList.add("light");
+  // Follow the device's light/dark setting until the user picks one.
+  const light = prefs.theme ? prefs.theme === "light" : matchMedia("(prefers-color-scheme: light)").matches;
+  document.body.classList.toggle("light", light);
   syncKind();
 }
 function syncKind() {
@@ -249,7 +252,7 @@ $("form").addEventListener("submit", async e => {
       url, kind: prefs.kind, quality: prefs.quality, abr: prefs.abr,
       playlist: $("playlist").checked, meta: prefs.meta, subs: prefs.subs, sponsor: prefs.sponsor,
       rate: prefs.rate, cookies: status.platform === "android" ? "" : prefs.cookies,
-      cover: prefs.cover, coverAt: parseTime(prefs.coverAt), coverImage: prefs.coverImage,
+      cover: prefs.cover, coverAt: parseTime(prefs.coverAt), coverImage: prefs.coverImage, useLogin: prefs.useLogin,
       from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value),
       title: lastInfo?.title || url,
     };
@@ -313,7 +316,7 @@ $("pickCover").addEventListener("click", async () => {
   } catch (e) { show(esc(t(e.message)), true); }
 });
 document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("change", () => { syncKind(); savePrefs(); }));
-["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip", "rate", "cookies"].forEach(id => $(id).addEventListener("change", () => {
+["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip", "rate", "cookies", "useLogin"].forEach(id => $(id).addEventListener("change", () => {
   savePrefs();
   if (id === "parallel") rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
 }));

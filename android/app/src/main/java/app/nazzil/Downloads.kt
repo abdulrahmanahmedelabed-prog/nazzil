@@ -117,7 +117,7 @@ object Downloads {
         try {
             while (!Tools.ready) Thread.sleep(200)
             if (!Tools.ytdlp) throw Exception("تعذر تهيئة yt-dlp على هذا الجهاز.")
-            val args = job.args.map { if (it == "__OUT__") work.absolutePath else it }
+            val args = withCookies(job.args).map { if (it == "__OUT__") work.absolutePath else it }
             val sep = args.indexOf("--")
             val req = YoutubeDLRequest(args.drop(sep + 1)).apply { addCommands(args.take(sep)) }
             try {
@@ -177,6 +177,45 @@ object Downloads {
     }
 
     private fun JSONObject.list(key: String): List<String> = getJSONArray(key).let { a -> List(a.length()) { a.getString(it) } }
+
+    // Sites people sign into inside Nazzil's browser. YouTube/Google are left out on purpose: YouTube rotates
+    // its cookies and may flag reused ones, and it works without them for nearly everything.
+    private val LOGIN_DOMAINS = listOf("instagram.com", "facebook.com", "tiktok.com", "x.com", "twitter.com",
+        "soundcloud.com", "vimeo.com", "twitch.tv", "dailymotion.com", "reddit.com")
+
+    /** Writes the in-app browser's cookies as cookies.txt for yt-dlp; returns null when there are none. */
+    fun exportCookies(): File? = runCatching {
+        val cm = android.webkit.CookieManager.getInstance()
+        cm.flush()
+        val expires = System.currentTimeMillis() / 1000 + 30L * 24 * 3600
+        val lines = StringBuilder("# Netscape HTTP Cookie File\n\n")
+        var count = 0
+        for (d in LOGIN_DOMAINS) {
+            // Ask for both the bare and www host so host-only cookies on either are included (deduplicated by name).
+            val seen = HashSet<String>()
+            val raw = listOf("https://$d/", "https://www.$d/").mapNotNull { cm.getCookie(it) }.joinToString(";")
+            for (pair in raw.split(";")) {
+                val i = pair.indexOf('=')
+                if (i <= 0) continue
+                val name = pair.substring(0, i).trim()
+                val value = pair.substring(i + 1).trim()
+                if (name.isEmpty() || name.contains('\t') || value.contains('\t') || !seen.add(name)) continue
+                lines.append(".$d\tTRUE\t/\tTRUE\t$expires\t$name\t$value\n")
+                count++
+            }
+        }
+        if (count == 0) return@runCatching null
+        File(app.filesDir, "browse-cookies.txt").apply { writeText(lines.toString()) }
+    }.getOrNull()
+
+    /** Replaces the "__COOKIES__" placeholder with the exported file, or removes the option when there is none. */
+    fun withCookies(args: List<String>): List<String> {
+        val i = args.indexOf("__COOKIES__")
+        if (i < 0) return args
+        val file = exportCookies()
+        return if (file != null) args.toMutableList().also { it[i] = file.absolutePath }
+        else args.filterIndexed { idx, _ -> idx != i && idx != i - 1 }
+    }
 
     /** Builds the chosen cover (video frame or user image) and embeds it into an audio file. */
     private fun applyCover(audio: File, job: Job): Boolean {
