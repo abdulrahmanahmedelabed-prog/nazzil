@@ -38,7 +38,7 @@
           <input id="url" type="text" inputmode="url" required placeholder="https://youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
           <button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط">×</button>
         </label>
-        <button type="button" id="browseBtn" class="browse-btn"><span class="yt">▶</span><span>تصفّح YouTube واختر الفيديو</span></button>
+        <button type="button" id="browseBtn" class="browse-btn"><span class="yt">▶</span><span>تصفّح YouTube و Facebook و TikTok… واختر الفيديو</span></button>
         <div id="dropzone" class="dropzone" role="button" tabindex="0"><span>اسحب الرابط هنا أو اضغط للصق من الحافظة</span><small>YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها</small><small>يمكنك لصق عدة روابط دفعة واحدة</small></div>
 
         <div id="preview" class="preview" hidden></div>
@@ -62,11 +62,30 @@
           </label>
         </div>
 
+        <div class="cover-box" id="coverBox">
+          <span class="field-title">صورة الغلاف</span>
+          <div class="seg" role="radiogroup">
+            <label><input type="radio" name="cover" value="thumb" checked><span>صورة المقطع</span></label>
+            <label><input type="radio" name="cover" value="frame"><span>لقطة من الفيديو</span></label>
+            <label><input type="radio" name="cover" value="custom"><span>صورة من جهازي</span></label>
+            <label><input type="radio" name="cover" value="none"><span>بدون صورة</span></label>
+          </div>
+          <div class="cover-extra" id="coverFrame" hidden>
+            <span>اللقطة عند الثانية</span>
+            <input id="coverAt" placeholder="0:30" inputmode="numeric" dir="ltr">
+            <small>مثال: 1:15 — إن كان المقطع أقصر تُؤخذ من بدايته</small>
+          </div>
+          <div class="cover-extra" id="coverCustom" hidden>
+            <button type="button" id="pickCover" class="ghost">اختر صورة…</button>
+            <span id="coverName" class="cover-name" data-no-i18n></span>
+          </div>
+        </div>
+
         <details class="advanced" id="advanced">
           <summary><span class="step">03</span> خيارات متقدمة</summary>
           <div class="opts">
             <label class="switch"><input type="checkbox" id="playlist"><span>تنزيل قائمة التشغيل كاملة</span></label>
-            <label class="switch"><input type="checkbox" id="meta" checked><span>تضمين الغلاف والبيانات (العنوان، الفنان)</span></label>
+            <label class="switch"><input type="checkbox" id="meta" checked><span>تضمين البيانات (العنوان، الفنان، الفصول)</span></label>
             <label class="switch"><input type="checkbox" id="subs"><span>تضمين الترجمة (عربي / إنجليزي)</span></label>
             <label class="switch"><input type="checkbox" id="sponsor"><span>حذف الإعلانات المدمجة والمقدمات (SponsorBlock)</span></label>
             <div class="trim">
@@ -96,6 +115,15 @@
     </aside>
   </div>
 
+  <dialog id="sites" class="settings sites-dlg">
+    <form method="dialog">
+      <h3>اختر المنصة</h3>
+      <p class="hint">افتح المنصة، ثم اضغط «⬇ تنزيل بـ نزّل» على أي فيديو.</p>
+      <div id="siteGrid" class="site-grid" data-no-i18n></div>
+      <button class="ghost close-sites" value="close">إغلاق</button>
+    </form>
+  </dialog>
+
   <dialog id="settings" class="settings">
     <form method="dialog">
       <h3>الإعدادات</h3>
@@ -109,9 +137,10 @@
     </form>
   </dialog>
 
-  <footer><span>نزّل <span data-no-i18n>4.1.1</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
+  <footer><span>نزّل <span data-no-i18n>4.2</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
 </div>
 <script src="i18n.js"></script>
+<script src="sites.js"></script>
 <script src="ytdlp.js"></script>
 <script src="app.js"></script>
 </body>

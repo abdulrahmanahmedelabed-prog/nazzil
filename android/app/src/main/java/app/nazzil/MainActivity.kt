@@ -10,6 +10,12 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.provider.OpenableColumns
+import java.io.File
+import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
 import org.json.JSONObject
@@ -18,6 +24,27 @@ class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private var pendingUrl: String? = null
     private var loaded = false
+    @Volatile private var imageResult: CompletableFuture<Uri?>? = null
+    private val imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri -> imageResult?.complete(uri) }
+
+    /**
+     * Lets the user pick a cover image (called from a background thread; blocks until they choose or cancel).
+     * The image is copied into app storage so it's still readable when the download finishes.
+     */
+    fun pickImage(): Pair<String, String>? {
+        val future = CompletableFuture<Uri?>()
+        imageResult = future
+        runOnUiThread { imagePicker.launch("image/*") }
+        val uri = future.get() ?: return null
+        val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        } ?: "image"
+        val dir = File(filesDir, "covers").apply { mkdirs() }
+        dir.listFiles()?.sortedBy { it.lastModified() }?.dropLast(10)?.forEach { it.delete() } // keep a few recent ones
+        val dest = File(dir, UUID.randomUUID().toString() + "." + name.substringAfterLast('.', "jpg").take(5))
+        contentResolver.openInputStream(uri)?.use { input -> dest.outputStream().use { input.copyTo(it) } } ?: return null
+        return dest.absolutePath to name
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -45,10 +45,18 @@ class Bridge(private val activity: MainActivity) {
         "download" -> {
             val args = a.getJSONArray("args").let { arr -> List(arr.length()) { arr.getString(it) } }
             activity.ensureNotificationPermission()
-            JSONObject().put("jobId", Downloads.add(a.optString("kind", "mp3"), a.optString("title"), args))
+            JSONObject().put("jobId", Downloads.add(a.optString("kind", "mp3"), a.optString("title"), args, a.optJSONObject("coverPlan")))
         }
         "jobs" -> JSONObject().put("jobs", Downloads.list())
-        "browse" -> { activity.runOnUiThread { activity.startActivity(Intent(activity, BrowseActivity::class.java)) }; ok() }
+        "browse" -> {
+            // The page passes the platform definition from web/sites.js.
+            val i = Intent(activity, BrowseActivity::class.java)
+                .putExtra(BrowseActivity.EXTRA_URL, a.optString("mobileUrl").ifEmpty { a.optString("url") })
+                .putExtra(BrowseActivity.EXTRA_MATCH, a.optString("match"))
+                .putExtra(BrowseActivity.EXTRA_NAME, a.optString("name"))
+            activity.runOnUiThread { activity.startActivity(i) }
+            ok()
+        }
         "pause" -> { Downloads.pause(a.getString("id")); ok() }
         "resume" -> { Downloads.resume(a.getString("id")); ok() }
         "cancel" -> { Downloads.cancel(a.getString("id")); ok() }
@@ -56,6 +64,7 @@ class Bridge(private val activity: MainActivity) {
         "settings" -> { a.optInt("parallel", 3).takeIf { it in 1..5 }?.let { Downloads.parallel = it }; Downloads.pump(); ok() }
         "open" -> { open(a.optString("file")); ok() }
         "pickFolder" -> JSONObject().put("folder", "Download/Nazzil")
+        "pickImage" -> activity.pickImage()?.let { (path, name) -> JSONObject().put("path", path).put("name", name) } ?: JSONObject()
         "update" -> {
             waitReady()
             YoutubeDL.getInstance().updateYoutubeDL(activity, YoutubeDL.UpdateChannel._STABLE)

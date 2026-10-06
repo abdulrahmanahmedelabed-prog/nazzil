@@ -28,7 +28,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * leaving the app. DownloadService keeps the process in the foreground while work is active.
  */
 object Downloads {
-    class Job(val id: String, val kind: String, val title: String, val args: List<String>) {
+    class Job(val id: String, val kind: String, val title: String, val args: List<String>, val cover: JSONObject?) {
+        val pages = ConcurrentHashMap<String, String>()
+        @Volatile var lastPage = ""
         val info: JSONObject = JSONObject().put("id", id).put("kind", kind).put("title", title).put("state", "queued").put("progress", 0)
         @Volatile var stopRequested = false
         fun state(): String = synchronized(info) { info.optString("state") }
@@ -45,9 +47,9 @@ object Downloads {
 
     private fun workDir(id: String) = File(app.cacheDir, "jobs/$id")
 
-    fun add(kind: String, title: String, args: List<String>): String {
+    fun add(kind: String, title: String, args: List<String>, cover: JSONObject? = null): String {
         val id = UUID.randomUUID().toString()
-        jobs[id] = Job(id, kind, title.take(200), args)
+        jobs[id] = Job(id, kind, title.take(200), args, cover)
         order.add(id)
         pump()
         return id
@@ -127,6 +129,14 @@ object Downloads {
             if (job.stopRequested) return
             val made = work.walkTopDown().filter { it.isFile && !it.name.endsWith(".part") && !it.name.endsWith(".ytdl") }.toList()
             if (made.isEmpty()) throw Exception("لم يُنشأ أي ملف.")
+            if (job.cover != null) {
+                job.set("stage" to "cover", "speed" to "", "eta" to "")
+                for (f in made) {
+                    if (job.stopRequested) return
+                    val ok = runCatching { applyCover(f, job) }.getOrDefault(false)
+                    if (!ok) job.set("warning" to "تعذر إضافة صورة الغلاف.")
+                }
+            }
             val playlist = made.size > 1
             val base = if (playlist) (made.first().parentFile?.name ?: "Nazzil") else ""
             val uris = made.map { f -> publish(f, base).also { saved[f.name] = it } }
@@ -161,7 +171,58 @@ object Downloads {
                 p.getOrNull(5)?.trim()?.toIntOrNull()?.let { job.set("items" to it) }
             }
             t.startsWith("NZS|") -> job.set("stage" to "post", "speed" to "", "eta" to "")
+            t.startsWith("NZW|") -> job.lastPage = t.removePrefix("NZW|")
+            t.startsWith("NZF|") -> job.pages[File(t.removePrefix("NZF|")).name] = job.lastPage
         }
+    }
+
+    private fun JSONObject.list(key: String): List<String> = getJSONArray(key).let { a -> List(a.length()) { a.getString(it) } }
+
+    /** Builds the chosen cover (video frame or user image) and embeds it into an audio file. */
+    private fun applyCover(audio: File, job: Job): Boolean {
+        val plan = job.cover ?: return true
+        val work = File(app.cacheDir, "cover-${job.id}").apply { deleteRecursively(); mkdirs() }
+        try {
+            val jpg = File(work, "cover.jpg")
+            if (plan.optString("mode") == "frame") {
+                val page = job.pages[audio.name]?.takeIf { it.isNotEmpty() } ?: job.lastPage
+                if (page.isEmpty()) return false
+                val clips = plan.getJSONArray("clips")
+                for (i in 0 until clips.length()) {
+                    work.listFiles()?.forEach { it.delete() }
+                    val args = clips.getJSONArray(i).let { a -> List(a.length()) { a.getString(it) } }
+                        .map { it.replace("__PAGE__", page).replace("__WORK__", work.absolutePath) }
+                    val sep = args.indexOf("--")
+                    runCatching { YoutubeDL.getInstance().execute(YoutubeDLRequest(args.drop(sep + 1)).apply { addCommands(args.take(sep)) }) }
+                    val clip = work.listFiles()?.firstOrNull { it.name.startsWith("clip.") } ?: continue
+                    if (ffmpeg(plan.list("toJpeg").map { it.replace("__SRC__", clip.absolutePath).replace("__JPG__", jpg.absolutePath) }) && jpg.exists()) break
+                }
+            } else {
+                val img = File(plan.optString("image"))
+                if (!img.exists()) return false
+                ffmpeg(plan.list("toJpeg").map { it.replace("__SRC__", img.absolutePath).replace("__JPG__", jpg.absolutePath) })
+            }
+            if (!jpg.exists()) return false
+            val out = File(work, "out." + audio.extension)
+            val token = "__AUDIO__." + job.kind
+            val ok = ffmpeg(plan.list("embed").map { it.replace(token, audio.absolutePath).replace("__JPG__", jpg.absolutePath).replace("__OUT__", out.absolutePath) })
+            if (!ok || !out.exists() || out.length() == 0L) return false
+            out.copyTo(audio, overwrite = true)
+            return true
+        } finally {
+            work.deleteRecursively()
+        }
+    }
+
+    /** Runs the FFmpeg bundled by youtubedl-android (same binary and library path yt-dlp uses). */
+    private fun ffmpeg(args: List<String>): Boolean {
+        val packages = File(app.noBackupFilesDir, "youtubedl-android/packages")
+        val bin = File(app.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        val pb = ProcessBuilder(listOf(bin.absolutePath) + args).redirectErrorStream(true)
+        pb.environment()["LD_LIBRARY_PATH"] = "${File(packages, "python").absolutePath}/usr/lib:${File(packages, "ffmpeg").absolutePath}/usr/lib"
+        val p = pb.start()
+        p.inputStream.bufferedReader().use { it.readText() }
+        return p.waitFor() == 0
     }
 
     /** One notification per finished job, so the user knows even when the app is in the background. */
