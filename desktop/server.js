@@ -1,5 +1,5 @@
 // Local-only RPC server (127.0.0.1) that drives yt-dlp without a shell.
-const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto");
+const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto"), os = require("os");
 const { spawn, execFile, execFileSync } = require("child_process");
 const { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds } = require("./web/ytdlp.js");
 
@@ -177,11 +177,13 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     else p.kill("SIGTERM");
   }
   const publicJob = j => ({ id: j.id, kind: j.opts.kind, title: j.title, state: j.state, progress: j.progress, speed: j.speed, eta: j.eta,
-    item: j.item, items: j.items, stage: j.stage, file: j.file, count: j.count, error: j.error, warning: j.warning });
+    item: j.item, items: j.items, stage: j.stage, file: j.file, count: j.count, error: j.error, warning: j.warning,
+    names: j.state === "done" ? j.files.map(f => path.basename(f)) : undefined });
 
   const methods = {
-    async status() {
+    async status(_, ctx = {}) {
       const [v, f] = await Promise.all([run(ytdlp, ["--version"], { timeout: 15000 }), run(ffmpeg, ["-version"], { timeout: 15000 })]);
+      if (ctx.remote) return { yt_dlp: v.ok, ffmpeg: f.ok, version: v.stdout.trim(), folder: "", canPickFolder: false, platform: "web", appVersion };
       return { yt_dlp: v.ok, ffmpeg: f.ok, version: v.stdout.trim(), folder: settings.folder, canPickFolder: true, platform: "windows", appVersion };
     },
     async info({ url }) {
@@ -242,6 +244,15 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       }
       return { ok: true };
     },
+    async lan({ enable }) {
+      if (enable === true) { settings.lanEnabled = true; saveSettings(); await startLan(); }
+      if (enable === false) { settings.lanEnabled = false; saveSettings(); stopLan(); }
+      if (enable === "reset") { stopLan(); settings.lanToken = ""; saveSettings(); if (settings.lanEnabled) await startLan(); }
+      const url = lanUrl();
+      let qr = "";
+      try { if (url) qr = await require("qrcode").toDataURL(url, { margin: 1, width: 240 }); } catch {}
+      return { enabled: !!lanServer, url, qr, hasNetwork: !!lanAddress() };
+    },
     async settings({ parallel: n }) { if (n >= 1 && n <= 5) { parallel = n; pump(); } return { ok: true }; },
     async open({ file }) {
       const target = file ? path.resolve(file) : settings.folder;
@@ -264,34 +275,117 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     },
   };
 
-  const server = http.createServer(async (req, res) => {
-    const u = new URL(req.url, "http://127.0.0.1");
-    const send = (code, body) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(body)); };
+  // Methods a phone/tablet on the LAN may call. Everything that acts on the PC itself (opening files or
+  // folders, dialogs, the in-app browser, updating the engine, LAN settings) stays local-only.
+  const REMOTE_OK = new Set(["status", "info", "download", "jobs", "cancel", "pause", "resume", "dismiss", "settings"]);
+  const uploadsDir = path.join(dataDir, "uploads");
+  const IMAGE_EXT = /\.(jpe?g|png|webp|bmp|gif)$/i;
+
+  /** Shared request handler; `remote` is true for the LAN listener (token already verified). */
+  function handle(req, res, remote, ownOrigin) {
+    const u = new URL(req.url, "http://localhost");
+    const send = (code, body, headers = {}) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", ...headers }); res.end(JSON.stringify(body)); };
+    const origin = req.headers.origin;
+    const sameOrigin = !origin || origin === ownOrigin(req);
     const m = u.pathname.match(/^\/api\/(\w+)$/);
     if (m) {
-      // Only accept same-origin requests so other local web pages can't drive the downloader.
-      const origin = req.headers.origin;
-      if (req.method !== "POST" || (origin && origin !== `http://127.0.0.1:${server.address().port}`)) return send(403, { error: "forbidden" });
+      // Only same-origin POSTs, so other web pages can't drive the downloader.
+      if (req.method !== "POST" || !sameOrigin) return send(403, { error: "forbidden" });
       const fn = methods[m[1]];
-      if (!fn) return send(404, { error: "unknown method" });
+      if (!fn || (remote && !REMOTE_OK.has(m[1]))) return send(404, { error: "unknown method" });
       let raw = "";
       req.on("data", c => { raw += c; if (raw.length > 1e5) req.destroy(); });
       req.on("end", async () => {
-        try { send(200, await fn(JSON.parse(raw || "{}"))); }
-        catch (e) { send(400, { error: String(e.message || e) }); }
+        try {
+          const args = JSON.parse(raw || "{}");
+          // A remote client may only use cover images it uploaded itself.
+          if (remote && args.coverImage && path.dirname(path.resolve(args.coverImage)) !== uploadsDir) delete args.coverImage;
+          send(200, await fn(args, { remote }));
+        } catch (e) { send(400, { error: String(e.message || e) }); }
       });
       return;
+    }
+    // Cover image upload from a browser (phone): raw bytes, name in a header, images only, 15 MB max.
+    if (u.pathname === "/upload" && req.method === "POST") {
+      if (!sameOrigin) return send(403, { error: "forbidden" });
+      const name = path.basename(decodeURIComponent(String(req.headers["x-name"] || "image.jpg")));
+      if (!IMAGE_EXT.test(name)) return send(400, { error: "image files only" });
+      const chunks = []; let size = 0;
+      req.on("data", c => { size += c.length; if (size > 15e6) req.destroy(); else chunks.push(c); });
+      req.on("end", () => {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        const dest = path.join(uploadsDir, crypto.randomUUID() + path.extname(name).toLowerCase());
+        fs.writeFileSync(dest, Buffer.concat(chunks));
+        send(200, { path: dest, name });
+      });
+      return;
+    }
+    // Finished files, streamed to the browser that asked for them ("download to this device").
+    const dl = u.pathname.match(/^\/dl\/([\w-]+)\/(\d+)$/);
+    if (dl) {
+      const job = jobs.get(dl[1]);
+      const file = job && job.state === "done" && job.files[+dl[2]];
+      if (!file || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+      const stat = fs.statSync(file);
+      res.writeHead(200, {
+        "Content-Type": { ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".mp4": "video/mp4", ".webm": "video/webm", ".mkv": "video/x-matroska" }[path.extname(file).toLowerCase()] || "application/octet-stream",
+        "Content-Length": stat.size,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`,
+      });
+      return fs.createReadStream(file).pipe(res);
     }
     const rel = u.pathname === "/" ? "index.html" : path.normalize(decodeURIComponent(u.pathname)).replace(/^[\\/]+/, "");
     const file = path.join(webDir, rel);
     if (!file.startsWith(webDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
     fs.createReadStream(file).pipe(res);
-  });
+  }
+
+  const server = http.createServer((req, res) => handle(req, res, false, () => `http://127.0.0.1:${server.address().port}`));
+
+  /* ---------- LAN access (phone/tablet browsers on the same Wi-Fi) ---------- */
+  let lanServer = null;
+  const LAN_PORT = 8090;
+  function lanAddress() {
+    const nets = Object.values(os.networkInterfaces()).flat().filter(n => n && n.family === "IPv4" && !n.internal);
+    const priv = nets.find(n => /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(n.address));
+    return (priv || nets[0] || {}).address || "";
+  }
+  function lanUrl() {
+    const ip = lanAddress();
+    return lanServer && ip ? `http://${ip}:${lanServer.address().port}/?k=${settings.lanToken}` : "";
+  }
+  const parseCookies = h => Object.fromEntries(String(h || "").split(";").map(x => x.trim().split("=")).filter(x => x[0]).map(([k, ...v]) => [k, v.join("=")]));
+  const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+  function startLan() {
+    if (lanServer) return Promise.resolve();
+    if (!settings.lanToken) { settings.lanToken = crypto.randomBytes(18).toString("base64url"); saveSettings(); }
+    lanServer = http.createServer((req, res) => {
+      const u = new URL(req.url, "http://localhost");
+      // The QR link carries the key once; it's then kept in a cookie that other sites can't send.
+      if (u.searchParams.has("k")) {
+        if (!safeEq(u.searchParams.get("k"), settings.lanToken)) { res.writeHead(403); return res.end("Invalid link"); }
+        res.writeHead(302, { Location: "/", "Set-Cookie": `nzk=${settings.lanToken}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000` });
+        return res.end();
+      }
+      if (!safeEq(parseCookies(req.headers.cookie).nzk || "", settings.lanToken)) {
+        res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+        return res.end('<meta name="viewport" content="width=device-width"><p style="font:16px sans-serif;padding:24px" dir="rtl">امسح رمز QR من إعدادات نزّل على الكمبيوتر.<br>Scan the QR code in Nazzil\'s settings on your computer.</p>');
+      }
+      handle(req, res, true, r => `http://${r.headers.host}`);
+    });
+    return new Promise(resolve => {
+      lanServer.once("error", () => { lanServer.listen(0, "0.0.0.0", resolve); }); // port busy → any free port
+      lanServer.listen(LAN_PORT, "0.0.0.0", resolve);
+    });
+  }
+  function stopLan() { if (lanServer) { lanServer.close(); lanServer = null; } }
+  if (settings.lanEnabled) startLan();
   // Stop yt-dlp children on quit (Windows doesn't kill them with the parent). Their partial files are kept,
   // and the queue file still lists them as working, so they resume on next launch.
   const stopAll = () => {
     shuttingDown = true;
+    stopLan();
     clearTimeout(saveTimer);
     const keep = [...jobs.values()].filter(j => ["queued", "working", "paused"].includes(j.state))
       .map(({ id, opts, title, state, progress, files }) => ({ id, opts, title, state, progress, files }));

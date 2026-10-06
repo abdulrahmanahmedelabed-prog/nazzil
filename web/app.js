@@ -183,7 +183,9 @@ function renderJobs(jobs) {
     if (j.state === "queued") line = `<span>${t("في الانتظار…")}</span>`;
     else if (j.state === "working") line = `<span>${j.stage === "cover" ? t("جارٍ إضافة الغلاف…") : j.stage === "post" ? t("جارٍ التحويل…") : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
     else if (j.state === "paused") line = `<span>${t("متوقف مؤقتًا")} · ${pct.toFixed(0)}%</span>`;
-    else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}${j.warning ? ` · ${esc(t(j.warning))}` : ""}</span><a href="#" data-open="${esc(j.file || "")}">${t(j.count > 1 ? "فتح المجلد" : "فتح")}</a>`;
+    else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}${j.warning ? ` · ${esc(t(j.warning))}` : ""}</span>` + (isWeb()
+      ? `<span class="dl-links">${(j.names || []).map((n, i) => `<a href="/dl/${encodeURIComponent(j.id)}/${i}" download="${esc(n)}" title="${esc(n)}">${j.count > 1 ? i + 1 : t("تنزيل إلى هذا الجهاز")}</a>`).join("")}</span>`
+      : `<a href="#" data-open="${esc(j.file || "")}">${t(j.count > 1 ? "فتح المجلد" : "فتح")}</a>`);
     else if (j.state === "cancelled") line = `<span>${t("أُلغي")}</span>`;
     else line = `<span>${esc(t(j.error || "تعذر إكمال العملية"))}</span>`;
     const b = (act, icon, label) => `<button data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon}</button>`;
@@ -205,7 +207,7 @@ async function pollJobs() {
       if (j.state === "done" && !seen.has(j.id)) {
         seen.add(j.id);
         sessionStorage.setItem("nz.seen", JSON.stringify([...seen]));
-        saveHistory({ file: j.file, name: j.title, kind: j.kind, count: j.count, at: Date.now() });
+        saveHistory({ file: isWeb() ? `/dl/${j.id}/0` : j.file, web: isWeb(), name: j.title, kind: j.kind, count: j.count, at: Date.now() });
       }
     }
     const busy = jobs.some(j => j.state === "queued" || j.state === "working");
@@ -227,7 +229,7 @@ function renderHistory() {
   const q = $("historySearch").value.trim().toLowerCase();
   const rows = (q ? all.filter(x => String(x.name).toLowerCase().includes(q)) : all).slice(0, 60);
   if (q && !rows.length) { $("history").innerHTML = `<div class="history-empty">${esc(t("لا نتائج"))}</div>`; return; }
-  $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString(NzI18n.lang)}${x.count > 1 ? ` · ${x.count} ${t("ملف")}` : ""}</small></div><a href="#" data-open="${esc(x.file)}" aria-label="${esc(t("فتح الملف"))}">↗</a></div>`).join("")
+  $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString(NzI18n.lang)}${x.count > 1 ? ` · ${x.count} ${t("ملف")}` : ""}</small></div>${x.web ? `<a href="${esc(x.file)}" download aria-label="${esc(t("تنزيل إلى هذا الجهاز"))}">↓</a>` : `<a href="#" data-open="${esc(x.file)}" aria-label="${esc(t("فتح الملف"))}">↗</a>`}</div>`).join("")
     : `<div class="history-empty">${esc(t("لا توجد تنزيلات بعد"))}<br><small>${esc(t("ستظهر ملفاتك هنا"))}</small></div>`;
 }
 
@@ -297,6 +299,12 @@ $("siteGrid").addEventListener("click", e => {
   if (!b) return;
   const site = NzSites.byId(b.dataset.site);
   $("sites").close();
+  if (isWeb()) {
+    // In a phone browser there's no in-app browser: open the site in a new tab and paste the link back.
+    window.open(site.mobileUrl || site.url, "_blank", "noopener");
+    show(esc(t("افتح الفيديو، انسخ رابطه، ثم ارجع والصقه هنا.")));
+    return;
+  }
   rpc("browse", { site: site.id, name: site.name, url: site.url, mobileUrl: site.mobileUrl || "", match: site.match })
     .catch(err => show(esc(t(err.message)), true));
 });
@@ -307,8 +315,8 @@ document.querySelectorAll("input[name=cover]").forEach(r => r.addEventListener("
 $("coverAt").addEventListener("change", savePrefs);
 $("pickCover").addEventListener("click", async () => {
   try {
-    const r = await rpc("pickImage");
-    if (!r.path) return;
+    const r = isWeb() ? await uploadCover() : await rpc("pickImage");
+    if (!r || !r.path) return;
     prefs.coverImage = r.path; prefs.coverName = r.name || r.path;
     $("coverName").textContent = prefs.coverName;
     savePrefs();
@@ -370,8 +378,12 @@ async function loadStatus() {
       $("engineVer").textContent = `yt-dlp ${status.version || ""}`;
       $("folderPath").textContent = status.folder || "—";
       $("pickFolder").hidden = !status.canPickFolder;
-      $("platform").textContent = t(status.platform === "android" ? "يعمل محليًا على Android" : "يعمل محليًا على Windows");
-      $("cookiesRow").hidden = status.platform === "android"; // Android apps can't read browser cookies
+      $("platform").textContent = t(platformText());
+      $("cookiesRow").hidden = status.platform !== "windows"; // only the desktop can read browser cookies
+      // In a phone browser (LAN mode) hide the controls that act on the computer itself.
+      for (const id of ["folderRow", "loginRow", "engineRow"]) $(id).hidden = isWeb();
+      $("lanRow").hidden = status.platform !== "windows";
+      if (status.platform === "windows") refreshLan();
       rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
       checkForUpdate(status.appVersion);
       return;
@@ -379,6 +391,39 @@ async function loadStatus() {
   }
   $("tools").textContent = t("الخدمة غير متصلة");
 }
+
+/* ---------- Phone access (LAN) ---------- */
+const isWeb = () => status.platform === "web";
+function uploadCover() {
+  return new Promise((resolve, reject) => {
+    const input = $("coverFile");
+    input.value = "";
+    input.onchange = async () => {
+      const f = input.files[0];
+      if (!f) return resolve(null);
+      try {
+        const r = await fetch("/upload", { method: "POST", headers: { "x-name": encodeURIComponent(f.name) }, body: f });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "فشل الطلب");
+        resolve(j);
+      } catch (e) { reject(e); }
+    };
+    input.click();
+  });
+}
+async function refreshLan(enable) {
+  try {
+    const r = await rpc("lan", enable === undefined ? {} : { enable });
+    $("lanToggle").checked = r.enabled;
+    $("lanPanel").hidden = !r.enabled;
+    if (r.enabled && !r.hasNetwork) { $("lanUrl").textContent = t("لا توجد شبكة. اتصل بالواي فاي أولًا."); $("lanQr").hidden = true; return; }
+    $("lanUrl").textContent = r.url || "";
+    $("lanQr").hidden = !r.qr;
+    if (r.qr) $("lanQr").src = r.qr;
+  } catch (e) { show(esc(t(e.message)), true); }
+}
+$("lanToggle").addEventListener("change", () => refreshLan($("lanToggle").checked));
+$("lanReset").addEventListener("click", () => refreshLan("reset"));
 
 /* ---------- App updates ---------- */
 const RELEASES = "https://api.github.com/repos/abdulrahmanahmedelabed-prog/nazzil/releases/latest";
@@ -404,10 +449,11 @@ async function checkForUpdate(current) {
 // Android hands us a URL shared from another app.
 window.nazzilSetUrl = url => { $("url").value = extractUrls(url).join(" ") || url; queueInfo(); show(esc(t("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."))); };
 
+const platformText = () => status.platform === "android" ? "يعمل محليًا على Android" : status.platform === "web" ? "يعمل عبر كمبيوترك" : "يعمل محليًا على Windows";
 function applyLang() {
   NzI18n.translatePage();
   $("langBtn").textContent = NzI18n.lang === "en" ? "ع" : "EN";
-  if (status.platform) $("platform").textContent = t(status.platform === "android" ? "يعمل محليًا على Android" : "يعمل محليًا على Windows");
+  if (status.platform) $("platform").textContent = t(platformText());
   renderHistory();
   pollJobs();
 }

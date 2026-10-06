@@ -94,3 +94,22 @@ html,body{overflow-x:hidden}
 .cover-name{color:var(--lime);font-size:11px;overflow-wrap:anywhere;min-width:0}
 body.light .cover-extra input{background:#fff}
 @media(max-width:470px){.seg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lan-panel{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
+.lan-panel[hidden]{display:none}
+.lan-panel img{width:150px;height:150px;border-radius:10px;background:#fff;flex:none}
+.lan-panel>div{display:grid;gap:7px;min-width:0}
+.lan-panel small{color:var(--muted);font-size:11px;line-height:1.6}
+.lan-panel code{direction:ltr;text-align:left;font-size:11px;padding:7px 9px;border-radius:8px;background:var(--card2);overflow-wrap:anywhere;user-select:all}
+.dl-links{display:flex;flex-wrap:wrap;gap:6px}
+@media(max-width:470px){.lan-panel{flex-direction:column;align-items:center}}
+/* Light theme: the lime accent is for dark backgrounds; on white, accent *text* needs a deeper green to stay readable. */
+body.light{background:radial-gradient(ellipse at 80% 0,#e3f5c8 0,transparent 55%),radial-gradient(ellipse at 0 100%,#dcefe8 0,transparent 50%),var(--bg)}
+body.light .message a,body.light .job a,body.light .history-item a,body.light .cover-name,body.light .chip,body.light .file-icon,
+body.light .tag,body.light .welcome h1 em,body.light .side-title h3 em,body.light .format-card b i,body.light .format-card mark,
+body.light .update-bar,body.light .step,body.light .live i{color:#3f6212}
+body.light .live i{background:#65a30d}
+body.light .chip,body.light .file-icon,body.light .format-card mark{background:#ecfccb}
+body.light .orbit span{background:#fff;color:#3f6212}
+body.light .dropzone{border-color:#a3c97a}
+body.light .lan-panel code{background:#f1f5ee}
+.preview[hidden],.search[hidden]{display:none}
