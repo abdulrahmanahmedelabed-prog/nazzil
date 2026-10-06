@@ -5,19 +5,31 @@ const { startServer } = require("./server");
 const binDir = app.isPackaged ? path.join(process.resourcesPath, "bin") : path.join(__dirname, "bin");
 let win, browser, stopAll = () => {};
 
-/** In-app YouTube window; the floating button (browse-preload.js) sends the chosen URL back. */
-function openBrowser() {
-  if (browser && !browser.isDestroyed()) { browser.focus(); return; }
+/** In-app browser for a platform; the floating button (browse-preload.js) sends the chosen URL back. */
+let browserMatch = "";
+function openBrowser(site) {
+  if (!site || !/^https:\/\//.test(site.url)) return;
+  browserMatch = String(site.match || "");
+  if (browser && !browser.isDestroyed()) { browser.loadURL(site.url); browser.setTitle(site.name); browser.focus(); return; }
   browser = new BrowserWindow({
-    width: 1100, height: 800, parent: win, title: "YouTube", autoHideMenuBar: true, backgroundColor: "#0f0f0f",
-    webPreferences: { preload: path.join(__dirname, "browse-preload.js"), partition: "persist:youtube", contextIsolation: true, sandbox: true },
+    width: 1100, height: 820, parent: win, title: String(site.name || ""), autoHideMenuBar: true, backgroundColor: "#0f0f0f",
+    // One persistent session so sign-ins (YouTube, Facebook, TikTok…) are remembered.
+    webPreferences: { preload: path.join(__dirname, "browse-preload.js"), partition: "persist:browse", contextIsolation: true, sandbox: true },
   });
-  // Stay on YouTube (and its sign-in pages); anything else opens in the system browser.
-  const allowed = u => /^https:\/\/([\w-]+\.)*(youtube\.com|youtu\.be|google\.com|gstatic\.com|googleusercontent\.com)(\/|$)/.test(u);
-  browser.webContents.setWindowOpenHandler(({ url }) => { if (/^https:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
-  browser.webContents.on("will-navigate", (e, url) => { if (!allowed(url)) { e.preventDefault(); shell.openExternal(url); } });
-  browser.loadURL("https://www.youtube.com/");
+  // Present as plain Chrome: some sites refuse to sign in from a UA that mentions Electron.
+  browser.webContents.setUserAgent(browser.webContents.getUserAgent().replace(/\s(Electron|nazzil|Nazzil)\/\S+/g, ""));
+  // Popups (share dialogs, login windows) open in the same window; non-https links go to the system browser.
+  browser.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//.test(url)) browser.loadURL(url); else shell.openExternal(url);
+    return { action: "deny" };
+  });
+  browser.webContents.on("will-navigate", (e, url) => { if (!/^https?:\/\//.test(url)) { e.preventDefault(); shell.openExternal(url); } });
+  browser.on("closed", () => { browser = null; });
+  browser.loadURL(site.url);
 }
+
+// The preload asks which URLs count as downloadable for the current platform.
+ipcMain.on("nazzil:pattern", e => { e.returnValue = browser && e.sender === browser.webContents ? browserMatch : ""; });
 
 ipcMain.on("nazzil:pick", (e, url) => {
   if (!browser || e.sender !== browser.webContents || !/^https:\/\//.test(url)) return;
@@ -32,7 +44,11 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   const started = await startServer({
     appVersion: app.getVersion(),
-    browse: () => openBrowser(),
+    browse: site => openBrowser(site),
+    pickImage: async () => {
+      const r = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "bmp", "gif"] }] });
+      return r.canceled ? null : r.filePaths[0];
+    },
     notify: (title, kind) => {
       if (!Notification.isSupported() || (win && win.isFocused())) return;
       const ar = app.getLocale().startsWith("ar");

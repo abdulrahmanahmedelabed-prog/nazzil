@@ -1,7 +1,7 @@
 // Local-only RPC server (127.0.0.1) that drives yt-dlp without a shell.
 const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto");
 const { spawn, execFile, execFileSync } = require("child_process");
-const { buildArgs, parseLine, summarizeInfo, validUrl } = require("./web/ytdlp.js");
+const { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds } = require("./web/ytdlp.js");
 
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png" };
 const EXE = process.platform === "win32" ? ".exe" : "";
@@ -24,7 +24,7 @@ function lastError(text) {
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {} }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -89,7 +89,8 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
         for (const line of lines) {
           const ev = parseLine(line);
           if (!ev) continue;
-          if (ev.file) { if (!job.files.includes(ev.file)) job.files.push(ev.file); }
+          if (ev.page) job.lastPage = ev.page;
+          else if (ev.file) { if (!job.files.includes(ev.file)) job.files.push(ev.file); (job.pages ||= {})[ev.file] = job.lastPage; }
           else if (job.state === "working") Object.assign(job, ev);
         }
       };
@@ -98,12 +99,21 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     const errReader = reader();
     p.stderr.on("data", d => { errReader(d); err += d.toString(); if (err.length > 8000) err = err.slice(-8000); });
     p.on("error", e => Object.assign(job, { state: "error", error: "تعذر تشغيل yt-dlp: " + e.message }));
-    p.on("close", code => {
+    p.on("close", async code => {
       job.proc = null;
       // Paused jobs keep their partial files so resuming continues where it stopped.
       if (job.state !== "paused" && job.state !== "stopping") fs.rm(tempDir, { recursive: true, force: true }, () => {});
       if (job.state === "working") {
         if (code === 0 && job.files.length) {
+          if (needsCover(job.opts)) {
+            Object.assign(job, { stage: "cover", speed: "", eta: "" });
+            for (const f of job.files) {
+              if (job.state !== "working") break;
+              try { await applyCover(f, (job.pages || {})[f], job.opts, job.id); }
+              catch (e) { job.warning = "تعذر إضافة صورة الغلاف."; }
+            }
+            if (job.state !== "working") { pump(); return; }
+          }
           const file = job.files.length > 1 ? path.dirname(job.files[0]) : job.files[0];
           Object.assign(job, { state: "done", progress: 100, file, count: job.files.length });
           notify(job.title, "done");
@@ -116,13 +126,43 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       pump();
     });
   }
+  /** Builds the chosen cover (video frame or user image) and embeds it into an audio file. */
+  async function applyCover(file, pageUrl, opts, id) {
+    if (!fs.existsSync(file)) return;
+    const work = path.join(dataDir, "tmp", id + "-cover");
+    fs.mkdirSync(work, { recursive: true });
+    try {
+      const jpg = path.join(work, "cover.jpg");
+      if (coverMode(opts) === "frame") {
+        if (!pageUrl) throw new Error("no page url");
+        // Try the chosen second; if the video is shorter than that, fall back to the first second.
+        for (const sec of [toSeconds(opts.coverAt) || 30, 1]) {
+          for (const f of fs.readdirSync(work)) fs.rmSync(path.join(work, f), { force: true });
+          await run(ytdlp, ["--ffmpeg-location", ffmpeg, ...coverArgs.clip(pageUrl, sec, path.join(work, "clip.%(ext)s"), opts.cookies)], { timeout: 120000 });
+          const clip = fs.readdirSync(work).find(f => f.startsWith("clip."));
+          if (clip && (await run(ffmpeg, coverArgs.toJpeg(path.join(work, clip), jpg))).ok && fs.existsSync(jpg)) break;
+        }
+      } else {
+        if (!opts.coverImage || !fs.existsSync(opts.coverImage)) throw new Error("image missing");
+        await run(ffmpeg, coverArgs.toJpeg(opts.coverImage, jpg));
+      }
+      if (!fs.existsSync(jpg)) throw new Error("no cover produced");
+      const out = path.join(work, "out" + path.extname(file));
+      const r = await run(ffmpeg, coverArgs.embed(file, jpg, out), { timeout: 120000 });
+      if (!r.ok || !fs.existsSync(out)) throw new Error(r.stderr || "embed failed");
+      fs.copyFileSync(out, file);
+    } finally {
+      fs.rmSync(work, { recursive: true, force: true });
+    }
+  }
+
   function killTree(p) {
     if (!p) return;
     if (process.platform === "win32") execFile("taskkill", ["/pid", String(p.pid), "/T", "/F"], { windowsHide: true }, () => {});
     else p.kill("SIGTERM");
   }
   const publicJob = j => ({ id: j.id, kind: j.opts.kind, title: j.title, state: j.state, progress: j.progress, speed: j.speed, eta: j.eta,
-    item: j.item, items: j.items, stage: j.stage, file: j.file, count: j.count, error: j.error });
+    item: j.item, items: j.items, stage: j.stage, file: j.file, count: j.count, error: j.error, warning: j.warning });
 
   const methods = {
     async status() {
@@ -156,7 +196,16 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       }
       return { ok: true };
     },
-    async browse() { browse(); return { ok: true }; },
+    async pickImage() {
+      const file = await pickImage();
+      return file ? { path: file, name: path.basename(file) } : {};
+    },
+    async browse({ site }) {
+      const { byId } = require("./web/sites.js");
+      const def = byId(site) || byId("youtube");
+      browse(def);
+      return { ok: true };
+    },
     async pause({ id }) {
       const j = jobs.get(id);
       if (j && (j.state === "working" || j.state === "queued")) { j.state = "paused"; j.speed = ""; j.eta = ""; killTree(j.proc); pump(); }

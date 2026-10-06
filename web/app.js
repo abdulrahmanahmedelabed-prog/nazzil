@@ -24,6 +24,16 @@ function rpc(method, args = {}) {
       const url = NzYtdlp.validUrl(args.url);
       if (!url) return Promise.reject(new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://"));
       args = { ...args, url, args: NzYtdlp.buildArgs({ ...args, url }, { outDir: "__OUT__" }) };
+      // Cover from a video frame or the user's image: native code runs these steps after the download.
+      if (NzYtdlp.needsCover(args)) {
+        const c = NzYtdlp.coverArgs, sec = NzYtdlp.toSeconds(args.coverAt) || 30;
+        args.coverPlan = {
+          mode: NzYtdlp.coverMode(args), image: args.coverImage || "",
+          clips: [sec, 1].map(x => c.clip("__PAGE__", x, "__WORK__/clip.%(ext)s")),
+          toJpeg: c.toJpeg("__SRC__", "__JPG__"),
+          embed: c.embed("__AUDIO__." + args.kind, "__JPG__", "__OUT__"),
+        };
+      }
     }
     if (method === "info") {
       const url = NzYtdlp.validUrl(args.url);
@@ -69,12 +79,13 @@ const looksLikeUrl = s => /^https?:\/\/\S+\.\S+/i.test((s || "").trim());
 const extractUrls = text => [...new Set((String(text || "").match(/https?:\/\/[^\s"'<>]+/gi) || []).map(u => u.replace(/[),.;]+$/, "")))];
 
 /* ---------- Preferences ---------- */
-const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "dark", rate: "", cookies: "" }, store.get(PREFS, {}));
+const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "dark", rate: "", cookies: "", cover: "thumb", coverAt: "", coverImage: "", coverName: "" }, store.get(PREFS, {}));
 function savePrefs() {
   Object.assign(prefs, {
     kind: new FormData($("form")).get("kind"), quality: $("quality").value, abr: $("abr").value,
     meta: $("meta").checked, subs: $("subs").checked, sponsor: $("sponsor").checked,
     parallel: $("parallel").value, autoClip: $("autoClip").checked, rate: $("rate").value, cookies: $("cookies").value,
+    cover: (document.querySelector("input[name=cover]:checked") || {}).value || "thumb", coverAt: $("coverAt").value.trim(),
   });
   store.set(PREFS, prefs);
 }
@@ -85,6 +96,9 @@ function applyPrefs() {
   $("meta").checked = prefs.meta; $("subs").checked = prefs.subs; $("sponsor").checked = prefs.sponsor;
   $("parallel").value = prefs.parallel; $("autoClip").checked = prefs.autoClip;
   $("rate").value = prefs.rate; $("cookies").value = prefs.cookies;
+  const c = document.querySelector(`input[name=cover][value="${prefs.cover}"]`);
+  if (c) c.checked = true;
+  $("coverAt").value = prefs.coverAt; $("coverName").textContent = prefs.coverName || "";
   if (prefs.theme === "light") document.body.classList.add("light");
   syncKind();
 }
@@ -94,6 +108,13 @@ function syncKind() {
   $("videoQ").classList.toggle("off", audio);
   $("abr").disabled = kind !== "mp3";
   $("audioQ").classList.toggle("off", kind !== "mp3");
+  $("coverBox").hidden = !audio;
+  syncCover();
+}
+function syncCover() {
+  const c = (document.querySelector("input[name=cover]:checked") || {}).value;
+  $("coverFrame").hidden = c !== "frame";
+  $("coverCustom").hidden = c !== "custom";
 }
 
 /* ---------- Preview ---------- */
@@ -157,9 +178,9 @@ function renderJobs(jobs) {
     const pct = Math.max(0, Math.min(100, j.progress || 0));
     let line;
     if (j.state === "queued") line = `<span>${t("في الانتظار…")}</span>`;
-    else if (j.state === "working") line = `<span>${j.stage === "post" ? t("جارٍ التحويل…") : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
+    else if (j.state === "working") line = `<span>${j.stage === "cover" ? t("جارٍ إضافة الغلاف…") : j.stage === "post" ? t("جارٍ التحويل…") : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
     else if (j.state === "paused") line = `<span>${t("متوقف مؤقتًا")} · ${pct.toFixed(0)}%</span>`;
-    else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}</span><a href="#" data-open="${esc(j.file || "")}">${t(j.count > 1 ? "فتح المجلد" : "فتح")}</a>`;
+    else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}${j.warning ? ` · ${esc(t(j.warning))}` : ""}</span><a href="#" data-open="${esc(j.file || "")}">${t(j.count > 1 ? "فتح المجلد" : "فتح")}</a>`;
     else if (j.state === "cancelled") line = `<span>${t("أُلغي")}</span>`;
     else line = `<span>${esc(t(j.error || "تعذر إكمال العملية"))}</span>`;
     const b = (act, icon, label) => `<button data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon}</button>`;
@@ -220,12 +241,15 @@ $("form").addEventListener("submit", async e => {
   const url = urls[0] || $("url").value.trim();
   if (!looksLikeUrl(url)) { show(esc(t("ألصق رابطًا صحيحًا يبدأ بـ https://")), true); $("url").focus(); return; }
   savePrefs();
+  const audioKind = prefs.kind === "mp3" || prefs.kind === "m4a";
+  if (audioKind && prefs.cover === "custom" && !prefs.coverImage) { show(esc(t("اختر صورة الغلاف أولًا.")), true); return; }
   $("submit").disabled = true;
   try {
     const body = {
       url, kind: prefs.kind, quality: prefs.quality, abr: prefs.abr,
       playlist: $("playlist").checked, meta: prefs.meta, subs: prefs.subs, sponsor: prefs.sponsor,
       rate: prefs.rate, cookies: status.platform === "android" ? "" : prefs.cookies,
+      cover: prefs.cover, coverAt: parseTime(prefs.coverAt), coverImage: prefs.coverImage,
       from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value),
       title: lastInfo?.title || url,
     };
@@ -262,10 +286,32 @@ $("url").addEventListener("paste", e => {
   if (urls.length > 1) { e.preventDefault(); $("url").value = urls.join(" "); }
   setTimeout(queueInfo, 0);
 });
-$("browseBtn").addEventListener("click", () => rpc("browse").catch(err => show(esc(t(err.message)), true)));
+// Browse: pick a platform, then the in-app browser shows a download button on its video pages.
+$("siteGrid").innerHTML = NzSites.SITES.map(x => `<button type="button" class="site" data-site="${x.id}"><i style="background:${x.color}">${x.icon}</i><span>${esc(x.name)}</span></button>`).join("");
+$("browseBtn").addEventListener("click", () => $("sites").showModal());
+$("siteGrid").addEventListener("click", e => {
+  const b = e.target.closest("[data-site]");
+  if (!b) return;
+  const site = NzSites.byId(b.dataset.site);
+  $("sites").close();
+  rpc("browse", { site: site.id, name: site.name, url: site.url, mobileUrl: site.mobileUrl || "", match: site.match })
+    .catch(err => show(esc(t(err.message)), true));
+});
 $("clearUrl").addEventListener("click", () => { $("url").value = ""; queueInfo(); $("url").focus(); });
 $("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); $("historySearch").value = ""; renderHistory(); });
 $("historySearch").addEventListener("input", renderHistory);
+document.querySelectorAll("input[name=cover]").forEach(r => r.addEventListener("change", () => { syncCover(); savePrefs(); }));
+$("coverAt").addEventListener("change", savePrefs);
+$("pickCover").addEventListener("click", async () => {
+  try {
+    const r = await rpc("pickImage");
+    if (!r.path) return;
+    prefs.coverImage = r.path; prefs.coverName = r.name || r.path;
+    $("coverName").textContent = prefs.coverName;
+    savePrefs();
+    show("");
+  } catch (e) { show(esc(t(e.message)), true); }
+});
 document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("change", () => { syncKind(); savePrefs(); }));
 ["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip", "rate", "cookies"].forEach(id => $(id).addEventListener("change", () => {
   savePrefs();
