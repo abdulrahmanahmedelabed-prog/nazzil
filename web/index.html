@@ -108,6 +108,7 @@
       </section>
       <section class="side-card">
         <div class="side-title"><h3>نشاطك الأخير</h3><button id="clearHistory" class="text-btn">مسح الكل</button></div>
+        <input type="file" id="coverFile" accept="image/*" hidden>
         <input id="historySearch" class="search" type="search" placeholder="ابحث في التنزيلات…" hidden>
         <div id="history" class="history"></div>
       </section>
@@ -131,14 +132,25 @@
       <div class="set-row"><div><b>التنزيلات المتزامنة</b><small>عدد الملفات التي تُنزّل في نفس الوقت</small></div><select id="parallel"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
       <div class="set-row"><div><b>حد السرعة</b><small>لترك الإنترنت متاحًا لبقية الأجهزة</small></div><select id="rate"><option value="">بلا حد</option><option value="500K">500 KB/s</option><option value="1M">1 MB/s</option><option value="2M">2 MB/s</option><option value="5M">5 MB/s</option><option value="10M">10 MB/s</option></select></div>
       <div class="set-row" id="cookiesRow"><div><b>ملفات تعريف الارتباط</b><small>للمقاطع المقيّدة بالعمر أو الخاصة بالأعضاء</small></div><select id="cookies"><option value="">بدون</option><option value="chrome">Chrome</option><option value="edge">Edge</option><option value="firefox">Firefox</option><option value="brave">Brave</option><option value="opera">Opera</option></select></div>
-      <div class="set-row"><div><b>استخدام تسجيل دخولي</b><small>حساباتك في متصفح نزّل (Instagram، Facebook…) للمحتوى الذي يتطلب الدخول</small></div><input type="checkbox" id="useLogin" checked></div>
+      <div class="set-row" id="loginRow"><div><b>استخدام تسجيل دخولي</b><small>حساباتك في متصفح نزّل (Instagram، Facebook…) للمحتوى الذي يتطلب الدخول</small></div><input type="checkbox" id="useLogin" checked></div>
       <div class="set-row" id="clipRow"><div><b>لصق تلقائي</b><small>التقاط الرابط من الحافظة عند فتح التطبيق</small></div><input type="checkbox" id="autoClip" checked></div>
-      <div class="set-row"><div><b>محرك التنزيل</b><small id="engineVer">yt-dlp</small></div><button type="button" id="updateBtn" class="ghost">تحديث</button></div>
+      <div class="set-row" id="lanRow" hidden><div><b>الوصول من الجوال</b><small>استخدم نزّل من متصفح أي جهاز على نفس شبكة الواي فاي</small></div><input type="checkbox" id="lanToggle"></div>
+      <div class="lan-panel" id="lanPanel" hidden>
+        <img id="lanQr" alt="QR">
+        <div>
+          <b>امسح الرمز بكاميرا الجوال</b>
+          <small>أو افتح هذا الرابط في متصفح الجوال:</small>
+          <code id="lanUrl" data-no-i18n></code>
+          <small>يجب أن يكون الجوال على نفس شبكة الواي فاي، وأن يبقى نزّل مفتوحًا على الكمبيوتر. إذا سألك Windows عن جدار الحماية فاختر «السماح».</small>
+          <button type="button" id="lanReset" class="ghost">إنشاء رابط جديد (يلغي القديم)</button>
+        </div>
+      </div>
+      <div class="set-row" id="engineRow"><div><b>محرك التنزيل</b><small id="engineVer">yt-dlp</small></div><button type="button" id="updateBtn" class="ghost">تحديث</button></div>
       <button class="download-btn" value="close">تم</button>
     </form>
   </dialog>
 
-  <footer><span>نزّل <span data-no-i18n>4.3</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
+  <footer><span>نزّل <span data-no-i18n>4.4</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
 </div>
 <script src="i18n.js"></script>
 <script src="sites.js"></script>
