@@ -24,7 +24,7 @@ function lastError(text) {
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, cookiesFile = "" }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -66,9 +66,24 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     settings.produced = [p, ...settings.produced.filter(x => x !== p)].slice(0, 300);
     saveSettings();
   }
+  // While yt-dlp updates itself its .exe is replaced, so no job may start (Windows locks running executables).
+  let updating = false;
+  const cookies = () => (cookiesFile && fs.existsSync(cookiesFile) && fs.statSync(cookiesFile).size > 80 ? cookiesFile : "");
+  async function selfUpdate() {
+    updating = true;
+    try {
+      const r = await run(ytdlp, ["-U"], { timeout: 120000 });
+      if (r.ok) { settings.lastUpdate = Date.now(); saveSettings(); }
+      return r;
+    } finally {
+      updating = false;
+      pump();
+    }
+  }
+
   function pump() {
     saveQueue();
-    if (shuttingDown) return;
+    if (shuttingDown || updating) return;
     const working = [...jobs.values()].filter(j => j.state === "working").length;
     const next = [...jobs.values()].filter(j => j.state === "queued");
     for (let i = 0; i < Math.min(parallel - working, next.length); i++) start(next[i]);
@@ -76,7 +91,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   function start(job) {
     job.state = "working";
     const tempDir = path.join(dataDir, "tmp", job.id);
-    const args = buildArgs(job.opts, { outDir: settings.folder, ffmpeg, tempDir });
+    const args = buildArgs(job.opts, { outDir: settings.folder, ffmpeg, tempDir, cookiesFile: cookies() });
     const p = spawn(ytdlp, args, { windowsHide: true });
     job.proc = p;
     let err = "";
@@ -138,7 +153,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
         // Try the chosen second; if the video is shorter than that, fall back to the first second.
         for (const sec of [toSeconds(opts.coverAt) || 30, 1]) {
           for (const f of fs.readdirSync(work)) fs.rmSync(path.join(work, f), { force: true });
-          await run(ytdlp, ["--ffmpeg-location", ffmpeg, ...coverArgs.clip(pageUrl, sec, path.join(work, "clip.%(ext)s"), opts.cookies)], { timeout: 120000 });
+          await run(ytdlp, ["--ffmpeg-location", ffmpeg, ...(cookies() && !opts.cookies && opts.useLogin !== false ? ["--cookies", cookies()] : []), ...coverArgs.clip(pageUrl, sec, path.join(work, "clip.%(ext)s"), opts.cookies)], { timeout: 120000 });
           const clip = fs.readdirSync(work).find(f => f.startsWith("clip."));
           if (clip && (await run(ffmpeg, coverArgs.toJpeg(path.join(work, clip), jpg))).ok && fs.existsSync(jpg)) break;
         }
@@ -172,7 +187,8 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     async info({ url }) {
       const u = validUrl(url);
       if (!u) throw new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://");
-      const r = await run(ytdlp, ["-J", "--flat-playlist", "--no-warnings", "--playlist-end", "500", "--", u], { timeout: 45000 });
+      const login = cookies() ? ["--cookies", cookies()] : [];
+      const r = await run(ytdlp, ["-J", "--flat-playlist", "--no-warnings", "--playlist-end", "500", ...login, "--", u], { timeout: 45000 });
       if (!r.ok) throw new Error(lastError(r.stderr));
       return summarizeInfo(JSON.parse(r.stdout));
     },
@@ -240,7 +256,8 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       return { folder: settings.folder };
     },
     async update() {
-      const r = await run(ytdlp, ["-U"], { timeout: 120000 });
+      if ([...jobs.values()].some(j => j.state === "working")) throw new Error("أوقف التنزيلات الجارية مؤقتًا ثم حدّث.");
+      const r = await selfUpdate();
       if (!r.ok) throw new Error(lastError(r.stderr + r.stdout) || "فشل التحديث");
       const v = await run(ytdlp, ["--version"]);
       return { version: v.stdout.trim() };
@@ -289,7 +306,11 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       } catch {}
     }
   };
-  return new Promise(resolve => server.listen(0, "127.0.0.1", () => { pump(); resolve({ port: server.address().port, stopAll }); }));
+  // Keep yt-dlp current automatically: sites change often and an old engine is the #1 cause of failures.
+  // Checked at launch (at most once a day), before any queued download starts.
+  const stale = !settings.lastUpdate || Date.now() - settings.lastUpdate > 24 * 3600 * 1000;
+  const ready = stale && fs.existsSync(ytdlp) ? selfUpdate().catch(() => {}) : Promise.resolve();
+  return new Promise(resolve => server.listen(0, "127.0.0.1", () => { ready.then(pump); resolve({ port: server.address().port, stopAll }); }));
 }
 
 module.exports = { startServer };

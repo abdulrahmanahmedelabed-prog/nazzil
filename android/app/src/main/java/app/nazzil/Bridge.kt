@@ -38,6 +38,7 @@ class Bridge(private val activity: MainActivity) {
             waitReady()
             val r = YoutubeDLRequest(a.getString("url")).apply {
                 addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings"); addOption("--playlist-end", "500")
+                Downloads.exportCookies()?.let { addOption("--cookies", it.absolutePath) }
             }
             val res = runCatching { YoutubeDL.getInstance().execute(r) }.getOrElse { throw Exception(Downloads.friendly(it.message)) }
             JSONObject().put("__raw", res.out)
