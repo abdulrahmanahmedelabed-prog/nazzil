@@ -12,7 +12,6 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:extractNativeLibs="true"
         android:theme="@style/Theme.Nazzil">
         <activity
             android:name=".MainActivity"

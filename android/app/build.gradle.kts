@@ -55,4 +55,7 @@ dependencies {
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    // enableEdgeToEdge() (activity 1.8+) and WindowInsets helpers for Android 15+ edge-to-edge.
+    implementation("androidx.activity:activity-ktx:1.9.3")
+    implementation("androidx.core:core-ktx:1.13.1")
 }
