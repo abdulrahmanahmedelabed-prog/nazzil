@@ -683,7 +683,9 @@ window.nazzilSetUrl = url => {
 const platformText = () => status.platform === "android" ? "يعمل محليًا على Android" : status.platform === "web" ? "يعمل عبر كمبيوترك" : "يعمل محليًا على Windows";
 function applyLang() {
   NzI18n.translatePage();
-  $("langBtn").textContent = NzI18n.lang === "en" ? "ع" : "EN";
+  if (!isWeb()) rpc("lang", { lang: NzI18n.lang }).catch(() => {}); // notifications follow the app's language
+  $("langCode").textContent = NzI18n.lang.toUpperCase();
+  $("langSel").value = NzI18n.lang;
   $("submit").querySelector("span").textContent = t(localFile ? "تحويل" : "تنزيل");
   if (isStore()) $("brandName").textContent = t("نزّل مفتوح");
   if (status.platform && status.yt_dlp && status.ffmpeg) $("tools").textContent = t(platformText());
@@ -691,7 +693,9 @@ function applyLang() {
   renderHistory();
   pollJobs();
 }
-$("langBtn").addEventListener("click", () => { NzI18n.set(NzI18n.lang === "en" ? "ar" : "en"); applyLang(); });
+// Each language is listed in its own name, so anyone can find theirs.
+$("langSel").innerHTML = NzI18n.LANGS.filter(([c]) => NzI18n.has(c)).map(([c, name]) => `<option value="${c}" lang="${c}">${esc(name)}</option>`).join("");
+$("langSel").addEventListener("change", e => { NzI18n.set(e.target.value); applyLang(); });
 
 renderSites();
 applyPrefs();

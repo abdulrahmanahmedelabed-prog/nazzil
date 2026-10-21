@@ -37,7 +37,7 @@ class DownloadService : Service() {
             started = true
             val nm = getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                nm.createNotificationChannel(NotificationChannel(CHANNEL, "التنزيلات", NotificationManager.IMPORTANCE_LOW))
+                nm.createNotificationChannel(NotificationChannel(CHANNEL, Lang.ctx(this).getString(R.string.channel_downloads), NotificationManager.IMPORTANCE_LOW))
             }
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
             ServiceCompat.startForeground(this, ID, build(Downloads.activeCount(), Downloads.activeProgress()), type)
@@ -51,7 +51,7 @@ class DownloadService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle(if (active == 1) "نزّل · تنزيل واحد جارٍ" else "نزّل · $active تنزيلات جارية")
+            .setContentTitle(Lang.ctx(this).resources.getQuantityString(R.plurals.downloads_running, active, active))
             .setContentText("$progress%")
             .setProgress(100, progress, progress == 0)
             .setOngoing(true)

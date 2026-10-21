@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">دانلودها</string>
+    <string name="channel_finished">دانلودهای تمام‌شده</string>
+    <string name="download_done">دانلود کامل شد</string>
+    <string name="download_failed">دانلود ناموفق بود</string>
+    <plurals name="downloads_running">
+        <item quantity="one">Nazzil · %d دانلود در جریان</item>
+        <item quantity="other">Nazzil · %d دانلود در جریان</item>
+    </plurals>
+</resources>

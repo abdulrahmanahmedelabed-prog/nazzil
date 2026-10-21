@@ -363,15 +363,15 @@ object Downloads {
     private fun notifyFinished(job: Job, ok: Boolean) {
         runCatching {
             val nm = app.getSystemService(NotificationManager::class.java)
+            val res = Lang.ctx(app).resources
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                nm.createNotificationChannel(NotificationChannel("finished", "اكتمال التنزيل", NotificationManager.IMPORTANCE_DEFAULT))
+                nm.createNotificationChannel(NotificationChannel("finished", res.getString(R.string.channel_finished), NotificationManager.IMPORTANCE_DEFAULT))
             }
-            val ar = java.util.Locale.getDefault().language == "ar"
             val open = PendingIntent.getActivity(app, 0, Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val n = NotificationCompat.Builder(app, "finished")
                 .setSmallIcon(if (ok) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
-                .setContentTitle(if (ok) (if (ar) "اكتمل التنزيل" else "Download complete") else (if (ar) "فشل التنزيل" else "Download failed"))
+                .setContentTitle(res.getString(if (ok) R.string.download_done else R.string.download_failed))
                 .setContentText(job.title)
                 .setContentIntent(open)
                 .setAutoCancel(true)

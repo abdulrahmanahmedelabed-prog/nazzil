@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">Unduhan</string>
+    <string name="channel_finished">Unduhan selesai</string>
+    <string name="download_done">Unduhan selesai</string>
+    <string name="download_failed">Unduhan gagal</string>
+    <plurals name="downloads_running">
+        <item quantity="other">Nazzil · %d unduhan berjalan</item>
+    </plurals>
+</resources>

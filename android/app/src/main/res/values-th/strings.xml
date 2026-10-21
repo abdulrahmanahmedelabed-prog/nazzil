@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">ดาวน์โหลด</string>
+    <string name="channel_finished">ดาวน์โหลดที่เสร็จแล้ว</string>
+    <string name="download_done">ดาวน์โหลดเสร็จแล้ว</string>
+    <string name="download_failed">ดาวน์โหลดล้มเหลว</string>
+    <plurals name="downloads_running">
+        <item quantity="other">Nazzil · กำลังดาวน์โหลด %d รายการ</item>
+    </plurals>
+</resources>

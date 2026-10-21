@@ -53,6 +53,7 @@ class Bridge(private val activity: MainActivity) {
         }
         "jobs" -> JSONObject().put("jobs", Downloads.list())
         "theme" -> { activity.applyTheme(a.optBoolean("light")); ok() }
+        "lang" -> { Lang.set(activity.applicationContext, a.optString("lang")); ok() }
         "browse" -> {
             // The page passes the platform definition from web/sites.js.
             val i = Intent(activity, BrowseActivity::class.java)

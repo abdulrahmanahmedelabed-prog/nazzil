@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">İndirmeler</string>
+    <string name="channel_finished">Tamamlanan indirmeler</string>
+    <string name="download_done">İndirme tamamlandı</string>
+    <string name="download_failed">İndirme başarısız</string>
+    <plurals name="downloads_running">
+        <item quantity="one">Nazzil · %d indirme sürüyor</item>
+        <item quantity="other">Nazzil · %d indirme sürüyor</item>
+    </plurals>
+</resources>

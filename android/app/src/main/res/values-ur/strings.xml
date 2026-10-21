@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">ڈاؤن لوڈز</string>
+    <string name="channel_finished">مکمل ڈاؤن لوڈز</string>
+    <string name="download_done">ڈاؤن لوڈ مکمل</string>
+    <string name="download_failed">ڈاؤن لوڈ ناکام</string>
+    <plurals name="downloads_running">
+        <item quantity="one">Nazzil · %d ڈاؤن لوڈ جاری</item>
+        <item quantity="other">Nazzil · %d ڈاؤن لوڈز جاری</item>
+    </plurals>
+</resources>

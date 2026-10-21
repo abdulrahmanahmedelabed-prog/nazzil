@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">Downloads</string>
+    <string name="channel_finished">Abgeschlossene Downloads</string>
+    <string name="download_done">Download abgeschlossen</string>
+    <string name="download_failed">Download fehlgeschlagen</string>
+    <plurals name="downloads_running">
+        <item quantity="one">Nazzil · %d Download läuft</item>
+        <item quantity="other">Nazzil · %d Downloads laufen</item>
+    </plurals>
+</resources>

@@ -109,9 +109,19 @@ test("every platform pattern matches its video pages and not its home page", () 
   assert.equal(byId("tiktok").name, "TikTok");
 });
 
+// Each lang/xx.js file, read without a browser: { code: { arabic: translation } }.
+const langFiles = fs.readdirSync(path.join(root, "web/lang")).filter(f => f.endsWith(".js"));
+const dicts = Object.fromEntries(langFiles.map(f => {
+  const out = {};
+  vm.runInNewContext(read("web/lang/" + f), { NzI18n: { add: (code, d) => Object.assign(out, d) } });
+  return [f.slice(0, -3), out];
+}));
+
 test("English translation covers every Arabic string in the page and app", () => {
-  const ctx = { window: {}, localStorage: { getItem: () => "en", setItem() {} }, navigator: { language: "en" }, document: {} };
+  const ctx = { localStorage: { getItem: () => "en", setItem() {} }, navigator: { language: "en" }, document: {} };
+  ctx.window = ctx;
   vm.runInNewContext(read("web/i18n.js"), ctx);
+  vm.runInNewContext(read("web/lang/en.js"), ctx);
   const { t } = ctx.window.NzI18n;
   const html = read("web/index.html").replace(/<script[\s\S]*?<\/script>/g, "").replace(/<svg[\s\S]*?<\/svg>/g, "");
   const noI18n = /data-no-i18n/;
@@ -121,6 +131,25 @@ test("English translation covers every Arabic string in the page and app", () =>
   const dynamic = [...app.matchAll(/(?:\bt|toast|emptyState)\((?:"[^"]*",\s*)?"([^"]*[؀-ۿ][^"]*)"/g)].map(m => m[1]);
   const missing = [...new Set([...texts, ...attrs, ...dynamic])].filter(s => t(s) === s);
   assert.deepEqual(missing, []);
+});
+
+test("every language translates every string and keeps formats, links and names intact", () => {
+  const ctx = { localStorage: { getItem: () => null, setItem() {} }, navigator: { language: "en" }, document: {} };
+  ctx.window = ctx;
+  vm.runInNewContext(read("web/i18n.js"), ctx);
+  const listed = Array.from(ctx.window.NzI18n.LANGS, l => l[0]).filter(c => c !== "ar").sort(); // copy out of the vm realm
+  assert.deepEqual(Object.keys(dicts).sort(), listed, "LANGS and web/lang/ must match");
+  const html = read("web/index.html");
+  for (const code of listed) assert.ok(html.includes(`<script src="lang/${code}.js">`), `index.html must load lang/${code}.js`);
+  const keys = Object.keys(dicts.en).sort();
+  const kept = /MP3|M4A|MP4|WEBM|https:\/\/|yt-dlp|FFmpeg|SponsorBlock|Google Takeout|\/Nazzil|\d+:\d+|8K|✓/g;
+  for (const [code, d] of Object.entries(dicts)) {
+    assert.deepEqual(Object.keys(d).sort(), keys, `${code}: same strings as English`);
+    for (const k of keys) {
+      assert.ok(d[k].trim(), `${code}: empty translation for ${k}`);
+      for (const tok of dicts.en[k].match(kept) || []) assert.ok(d[k].includes(tok), `${code}: "${d[k]}" lost "${tok}"`);
+    }
+  }
 });
 
 test("Windows and Android report the same version", () => {
@@ -180,7 +209,25 @@ test("converting a local file: formats, trim, metadata, fast copy", () => {
   assert.deepEqual(y.frameArgs("/v.mp4", 12, "/c.jpg").slice(3, 7), ["-ss", "12", "-i", "/v.mp4"]);
 });
 
-test("the English dictionary has no duplicate keys (a duplicate silently overrides the first)", () => {
-  const keys = [...read("web/i18n.js").matchAll(/^\s*"([^"]+)":/gm)].map(m => m[1]);
-  assert.deepEqual(keys.filter((k, i) => keys.indexOf(k) !== i), []);
+test("Windows and Android notifications speak every app language", () => {
+  const ctx = { localStorage: { getItem: () => null, setItem() {} }, navigator: { language: "en" }, document: {} };
+  ctx.window = ctx;
+  vm.runInNewContext(read("web/i18n.js"), ctx);
+  const codes = Array.from(ctx.window.NzI18n.LANGS, l => l[0]);
+  const { TEXT } = require("../desktop/notify-text.js");
+  assert.deepEqual(Object.keys(TEXT).sort(), [...codes].sort());
+  for (const c of codes) {
+    assert.ok(TEXT[c].length === 3 && TEXT[c].every(Boolean), `notify-text ${c}`);
+    const dir = "android/app/src/main/res/values" + (c === "en" ? "" : "-" + (c === "id" ? "in" : c)); // Android still files Indonesian as "in"
+    const xml = read(dir + "/strings.xml");
+    for (const name of ["channel_downloads", "channel_finished", "download_done", "download_failed", "downloads_running"]) assert.ok(xml.includes(`name="${name}"`), `${dir}: ${name}`);
+    assert.match(xml, /quantity="other">[^<]*%d/, `${dir}: plural needs %d`);
+  }
+});
+
+test("no dictionary has duplicate keys (a duplicate silently overrides the first)", () => {
+  for (const f of langFiles) {
+    const keys = [...read("web/lang/" + f).matchAll(/^\s*"([^"]+)":/gm)].map(m => m[1]);
+    assert.deepEqual(keys.filter((k, i) => keys.indexOf(k) !== i), [], f);
+  }
 });

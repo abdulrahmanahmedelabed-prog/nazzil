@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">Загрузки</string>
+    <string name="channel_finished">Завершённые загрузки</string>
+    <string name="download_done">Загрузка завершена</string>
+    <string name="download_failed">Ошибка загрузки</string>
+    <plurals name="downloads_running">
+        <item quantity="one">Nazzil · %d загрузка</item>
+        <item quantity="few">Nazzil · %d загрузки</item>
+        <item quantity="many">Nazzil · %d загрузок</item>
+        <item quantity="other">Nazzil · %d загрузки</item>
+    </plurals>
+</resources>

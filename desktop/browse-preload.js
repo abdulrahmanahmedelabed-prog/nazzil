@@ -5,8 +5,8 @@ const { ipcRenderer } = require("electron");
 let re = null;
 try { const src = ipcRenderer.sendSync("nazzil:pattern"); if (src) re = new RegExp(src, "i"); } catch {}
 const isMedia = u => (re ? re.test(u) : false);
-const ar = (navigator.language || "").toLowerCase().startsWith("ar");
-const label = ar ? "⬇ تنزيل بـ نزّل" : "⬇ Download with Nazzil";
+let label = "⬇ Download with Nazzil";
+try { label = ipcRenderer.sendSync("nazzil:label") || label; } catch {}
 
 function ensureButton() {
   let b = document.getElementById("__nazzil_btn");

@@ -24,7 +24,7 @@ function lastError(text) {
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, pickMedia = async () => null, cookiesFile = "" }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, setLang = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, pickMedia = async () => null, cookiesFile = "" }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -252,6 +252,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     names: j.state === "done" ? j.files.map(f => path.basename(f)) : undefined, local: !!j.opts.local });
 
   const methods = {
+    lang: async body => { setLang(String(body.lang || "")); return { ok: true }; },
     async status(_, ctx = {}) {
       const [v, f] = await Promise.all([run(ytdlp, ["--version"], { timeout: 15000 }), run(ffmpeg, ["-version"], { timeout: 15000 })]);
       if (ctx.remote) return { yt_dlp: v.ok, ffmpeg: f.ok, version: v.stdout.trim(), folder: "", canPickFolder: false, platform: "web", appVersion };

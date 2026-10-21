@@ -1,4 +1,5 @@
 const { app, BrowserWindow, shell, Menu, dialog, Notification, ipcMain, session } = require("electron");
+const { text } = require("./notify-text");
 const fs = require("fs");
 const { cookieJar } = require("./web/ytdlp.js");
 const path = require("path");
@@ -41,7 +42,11 @@ function openBrowser(site) {
   browser.loadURL(site.url);
 }
 
-// The preload asks which URLs count as downloadable for the current platform.
+let uiLang = ""; // set by the web UI; until then follow the system language
+const words = () => text(uiLang || app.getLocale());
+
+// The preload asks which URLs count as downloadable for the current platform, and how to label its button.
+ipcMain.on("nazzil:label", e => { e.returnValue = words()[2]; });
 ipcMain.on("nazzil:pattern", e => { e.returnValue = browser && e.sender === browser.webContents ? browserMatch : ""; });
 
 ipcMain.on("nazzil:pick", (e, url) => {
@@ -71,10 +76,10 @@ app.whenReady().then(async () => {
       const r = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "bmp", "gif"] }] });
       return r.canceled ? null : r.filePaths[0];
     },
+    setLang: l => { uiLang = l; },
     notify: (title, kind) => {
       if (!Notification.isSupported() || (win && win.isFocused())) return;
-      const ar = app.getLocale().startsWith("ar");
-      const head = kind === "done" ? (ar ? "اكتمل التنزيل" : "Download complete") : (ar ? "فشل التنزيل" : "Download failed");
+      const head = words()[kind === "done" ? 0 : 1];
       const n = new Notification({ title: head, body: title, silent: kind !== "done" });
       n.on("click", () => { if (win) { win.show(); win.focus(); } });
       n.show();

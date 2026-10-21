@@ -1,7 +1,7 @@
 {
   "name": "nazzil",
   "productName": "Nazzil",
-  "version": "4.7.0",
+  "version": "4.8.0",
   "description": "Nazzil — video & audio downloader",
   "main": "main.js",
   "author": "Abdulrahman Ahmed",
@@ -27,6 +27,7 @@
       "main.js",
       "server.js",
       "browse-preload.js",
+      "notify-text.js",
       "web/**",
       "build/icon.png"
     ],

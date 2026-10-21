@@ -1,255 +1,61 @@
-// Arabic is the source language (it's what the HTML is written in); this maps each Arabic string to English.
+// Translation engine. Arabic is the source language (it's what the HTML and messages are written in);
+// each file in lang/ maps those Arabic strings to one language: NzI18n.add("xx", { "عربي": "translation" }).
 // The page's static text is translated by walking text nodes, so the HTML needs no extra markup.
 (function () {
   "use strict";
-  const EN = {
-    "نزّل": "Nazzil",
-    "نزّل — فيديو وصوت": "Nazzil — Video & Audio",
-    "استوديو الفيديو والصوت": "Video & audio studio",
-    "محلي وآمن": "Local & private",
-    "الإعدادات": "Settings",
-    "المظهر": "Theme",
-    "تبديل المظهر": "Toggle theme",
-    "اللغة": "Language",
-    "مساحة التحويل الخاصة بك": "Your conversion space",
-    "من الرابط إلى ملف جاهز": "From link to file",
-    "بلمسة واحدة.": "in one tap.",
-    "YouTube وأكثر من 1000 موقع · قوائم تشغيل · حتى 4K · بلا إعلانات. ملفاتك تبقى على جهازك.": "YouTube and 1000+ sites · playlists · up to 4K · no ads. Your files stay on your device.",
-    "أضف الرابط": "Add a link",
-    "فحص الأدوات…": "Checking tools…",
-    "رابط الفيديو أو قائمة التشغيل": "Video or playlist link",
-    "مسح الرابط": "Clear link",
-    "اسحب الرابط هنا أو اضغط للصق من الحافظة": "Drop a link here or tap to paste from clipboard",
-    "YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها": "YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo and more",
-    "الصيغة والجودة": "Format & quality",
-    "صوت متوافق مع كل الأجهزة": "Audio that plays everywhere",
-    "الأكثر طلبًا": "Popular",
-    "صوت أصلي بلا إعادة ترميز": "Original audio, no re-encoding",
-    "فيديو يعمل في كل مكان": "Video that plays everywhere",
-    "أعلى جودة · حتى 8K": "Top quality · up to 8K",
-    "دقة الفيديو": "Video resolution",
-    "أفضل متاح": "Best available",
-    "جودة الصوت": "Audio quality",
-    "الأعلى (VBR)": "Highest (VBR)",
-    "خيارات متقدمة": "Advanced options",
-    "تنزيل قائمة التشغيل كاملة": "Download the whole playlist",
-    "تضمين البيانات (العنوان، الفنان، الفصول)": "Embed metadata (title, artist, chapters)",
-    "صورة الغلاف": "Cover image",
-    "صورة المقطع": "Video thumbnail",
-    "لقطة من الفيديو": "Frame from video",
-    "صورة من جهازي": "My own image",
-    "بدون صورة": "No image",
-    "اللقطة عند الثانية": "Frame at",
-    "مثال: 1:15 — إن كان المقطع أقصر تُؤخذ من بدايته": "e.g. 1:15 — if the video is shorter, the first second is used",
-    "اختر صورة…": "Choose image…",
-    "اختر صورة الغلاف أولًا.": "Choose a cover image first.",
-    "جارٍ إضافة الغلاف…": "Adding cover…",
-    "تعذر إضافة صورة الغلاف.": "Couldn't add the cover image.",
-    "تضمين الترجمة (عربي / إنجليزي)": "Embed subtitles (Arabic / English)",
-    "حذف الإعلانات المدمجة والمقدمات (SponsorBlock)": "Remove sponsor segments (SponsorBlock)",
-    "قص مقطع": "Trim",
-    "من 0:00": "From 0:00",
-    "إلى 1:30": "To 1:30",
-    "إضافة إلى التنزيلات": "Add to downloads",
-    "قائمة التنزيل": "Downloads",
-    "لا توجد تنزيلات جارية": "No active downloads",
-    "نشاطك الأخير": "Recent",
-    "مسح الكل": "Clear all",
-    "لا توجد تنزيلات بعد": "No downloads yet",
-    "ستظهر ملفاتك هنا": "Your files will appear here",
-    "خصوصيتك أولاً": "Privacy first",
-    "المعالجة تتم على جهازك. لا حسابات، لا تتبع، لا إعلانات.": "Everything runs on your device. No accounts, no tracking, no ads.",
-    "مجلد الحفظ": "Save folder",
-    "تغيير": "Change",
-    "فتح": "Open",
-    "التنزيلات المتزامنة": "Parallel downloads",
-    "عدد الملفات التي تُنزّل في نفس الوقت": "Files downloaded at the same time",
-    "حد السرعة": "Speed limit",
-    "لترك الإنترنت متاحًا لبقية الأجهزة": "Leave bandwidth for other devices",
-    "بلا حد": "Unlimited",
-    "ملفات تعريف الارتباط": "Browser cookies",
-    "للمقاطع المقيّدة بالعمر أو الخاصة بالأعضاء": "For age-restricted or members-only videos",
-    "بدون": "None",
-    "استخدام تسجيل دخولي": "Use my sign-ins",
-    "حساباتك في متصفح نزّل (Instagram، Facebook…) للمحتوى الذي يتطلب الدخول": "Your accounts in Nazzil's browser (Instagram, Facebook…) for content that needs a login",
-    "أوقف التنزيلات الجارية مؤقتًا ثم حدّث.": "Pause active downloads, then update.",
-    "الوصول من الجوال": "Phone access",
-    "استخدم نزّل من متصفح أي جهاز على نفس شبكة الواي فاي": "Use Nazzil from any browser on the same Wi-Fi",
-    "امسح الرمز بكاميرا الجوال": "Scan with your phone's camera",
-    "أو افتح هذا الرابط في متصفح الجوال:": "Or open this link in the phone's browser:",
-    "يجب أن يكون الجوال على نفس شبكة الواي فاي، وأن يبقى نزّل مفتوحًا على الكمبيوتر. إذا سألك Windows عن جدار الحماية فاختر «السماح».": "The phone must be on the same Wi-Fi and Nazzil must stay open on the computer. If Windows asks about the firewall, choose Allow.",
-    "إنشاء رابط جديد (يلغي القديم)": "New link (revokes the old one)",
-    "تنزيل إلى هذا الجهاز": "Save to this device",
-    "يعمل عبر كمبيوترك": "Running through your computer",
-    "افتح الفيديو، انسخ رابطه، ثم ارجع والصقه هنا.": "Open the video, copy its link, then come back and paste it here.",
-    "لا توجد شبكة. اتصل بالواي فاي أولًا.": "No network. Connect to Wi-Fi first.",
-    "لصق تلقائي": "Auto-paste",
-    "التقاط الرابط من الحافظة عند فتح التطبيق": "Grab a link from the clipboard when the app opens",
-    "محرك التنزيل": "Download engine",
-    "تحديث": "Update",
-    "تم": "Done",
-    "يعمل محليًا على جهازك": "Runs locally on your device",
-    "يعمل محليًا على Windows": "Runs locally on Windows",
-    "يعمل محليًا على Android": "Runs locally on Android",
-    "للمحتوى المصرّح به فقط": "For authorized content only",
-    "تصفّح YouTube و Facebook و TikTok… واختر الفيديو": "Browse YouTube, Facebook, TikTok… and pick a video",
-    "اختر المنصة": "Choose a platform",
-    "افتح المنصة، ثم اضغط «⬇ تنزيل بـ نزّل» على أي فيديو.": "Open a platform, then tap “⬇ Download with Nazzil” on any video.",
-    "إغلاق": "Close",
-    "يمكنك لصق عدة روابط دفعة واحدة": "You can paste several links at once",
-    "ابحث في التنزيلات…": "Search downloads…",
-    "الصق رابط فيديو أو قائمة تشغيل…": "Paste a video or playlist link…",
-    "لصق": "Paste",
-    "أو تصفّح:": "Or browse:",
-    "الصيغة": "Format",
-    "صوت": "Audio",
-    "صوت أصلي": "Original audio",
-    "فيديو": "Video",
-    "حتى 8K": "Up to 8K",
-    "الأعلى": "Highest",
-    "الإضافات": "Add-ons",
-    "تنزيل": "Download",
-    "التنزيلات": "Downloads",
-    "السجل": "History",
-    "فتح مجلد التنزيلات": "Open downloads folder",
-    "إعادة الضبط": "Reset",
-    "للصوت": "audio only",
-    "اللقطة عند": "Frame at",
-    "خيارات": "Options",
-    "من": "From",
-    "إلى": "To",
-    "تُطبَّق الإضافات على التنزيل التالي وتُحفظ لمرّات قادمة.": "Add-ons apply to the next download and are remembered.",
-    "أفلت الرابط هنا": "Drop the link here",
-    "بلا حسابات ولا إعلانات ولا تتبع. كل المعالجة تتم على جهازك.": "No accounts, no ads, no tracking. Everything runs on your device.",
-    "نزّل فقط ما تملكه أو لديك إذن بتنزيله، والتزم بشروط كل منصة.": "Only download what you own or have permission to download, and follow each platform's terms.",
-    "يستخدم برمجيات مفتوحة المصدر: yt-dlp، FFmpeg (GPL)، youtubedl-android (GPL-3.0)، Deno. نزّل مرخّص بـ GPL-3.0.": "Uses open-source software: yt-dlp, FFmpeg (GPL), youtubedl-android (GPL-3.0), Deno. Nazzil is licensed under GPL-3.0.",
-    "نزّل — مصادر مفتوحة": "Nazzil — Open sources",
-    "نزّل مفتوح": "Nazzil Open",
-    "هذه النسخة تنزّل من مصادر تسمح بالتنزيل فقط:": "This edition downloads only from sources that allow downloading:",
-    "Internet Archive — أفلام وصوتيات في الملكية العامة": "Internet Archive — public-domain films and audio",
-    "Wikimedia Commons — وسائط بتراخيص حرّة": "Wikimedia Commons — freely licensed media",
-    "PeerTube — منصات فيديو مفتوحة": "PeerTube — open video platforms",
-    "البودكاست والروابط المباشرة لملفات الصوت والفيديو": "Podcasts and direct links to audio and video files",
-    "نزّل فقط ما تملكه أو ما يسمح ترخيصه بتنزيله.": "Only download what you own or what its license allows you to download.",
-    "فهمت": "Got it",
-    "من جهازي": "From device",
-    "تحويل ملف من جهازك": "Convert a file from your device",
-    "فيديوهاتك على YouTube": "Your YouTube videos",
-    "فيديوهاتك أنت من YouTube": "Your own videos from YouTube",
-    "إذا كنت صاحب القناة، تتيح Google تنزيل فيديوهاتك الأصلية رسميًا عبر Google Takeout:": "If you own the channel, Google officially lets you download your original videos with Google Takeout:",
-    "افتح Google Takeout وسجّل الدخول بحساب قناتك.": "Open Google Takeout and sign in with your channel's account.",
-    "اضغط «إلغاء تحديد الكل»، ثم اختر «YouTube وYouTube Music» فقط.": "Click “Deselect all”, then select only “YouTube and YouTube Music”.",
-    "من «جميع بيانات YouTube المضمّنة» اختر «فيديوهات» فقط، ثم «الخطوة التالية» و«إنشاء تصدير».": "Under “All YouTube data included” choose only “videos”, then “Next step” and “Create export”.",
-    "عندما يصلك بريد من Google، نزّل الملف وافتحه على جهازك.": "When Google emails you, download the archive and open it on your device.",
-    "عُد إلى نزّل واضغط «من جهازي» واختر الفيديو لتحويله إلى MP3 أو M4A أو MP4، مع القص وصورة الغلاف.": "Back in Nazzil, tap “From device” and pick the video to convert it to MP3, M4A or MP4, with trimming and a cover image.",
-    "افتح Google Takeout": "Open Google Takeout",
-    // dynamic
-    "هذه النسخة تنزّل من المصادر المفتوحة فقط: Internet Archive وWikimedia Commons وPeerTube والبودكاست والروابط المباشرة.": "This edition only downloads from open sources: Internet Archive, Wikimedia Commons, PeerTube, podcasts and direct links.",
-    "الصق رابطًا من مصدر مفتوح أو رابط ملف مباشر…": "Paste a link from an open source or a direct file link…",
-    "ملف من جهازك": "File from your device",
-    "تم استلام الملف. اختر الصيغة ثم «تحويل».": "File received. Pick a format, then “Convert”.",
-    "إزالة الملف": "Remove file",
-    "تحويل": "Convert",
-    "أُضيف إلى قائمة التحويل ✓": "Added to the queue ✓",
-    "حوّل الملفات إلى MP3 أو M4A أو MP4.": "Convert files to MP3, M4A or MP4.",
-    "جارٍ رفع الملف…": "Uploading the file…",
-    "جارٍ التحويل": "Converting",
-    "الملف تالف أو بصيغة غير مدعومة.": "The file is damaged or in an unsupported format.",
-    "الملف لا يحتوي على صوت أو فيديو يمكن تحويله.": "The file has no audio or video to convert.",
-    "تعذر تحويل الملف.": "Couldn't convert the file.",
-    "ملفات الصوت والفيديو فقط.": "Audio and video files only.",
-    "قائمة كاملة": "Whole playlist",
-    "ترجمة": "Subtitles",
-    "بلا بيانات": "No metadata",
-    "الصق رابطًا في الأعلى أو اسحبه إلى النافذة.": "Paste a link above or drag it onto the window.",
-    "السجل فارغ": "History is empty",
-    "ستظهر ملفاتك المكتملة هنا.": "Finished files will appear here.",
-    "لا يوجد رابط في الحافظة.": "No link in the clipboard.",
-    "اسمح بالوصول إلى الحافظة أو الصق الرابط يدويًا.": "Allow clipboard access or paste the link manually.",
-    "روابط ستُضاف كلها إلى قائمة التنزيل": "links will all be added to the queue",
-    "أُضيفت الروابط إلى قائمة التنزيل ✓": "Links added to downloads ✓",
-    "لا نتائج": "No results",
-    "إصدار جديد متاح": "New version available",
-    "اضغط للتحميل": "click to download",
-    "جارٍ جلب المعلومات…": "Fetching info…",
-    "بدون عنوان": "Untitled",
-    "قائمة": "Playlist",
-    "مقطع": "videos",
-    "ملف": "files",
-    "جارٍ": "active",
-    "في الانتظار…": "Queued…",
-    "جارٍ التحويل…": "Converting…",
-    "اكتمل": "Done",
-    "فتح المجلد": "Open folder",
-    "أُلغي": "Cancelled",
-    "متوقف مؤقتًا": "Paused",
-    "إيقاف مؤقت": "Pause",
-    "استئناف": "Resume",
-    "إعادة المحاولة": "Retry",
-    "إلغاء": "Cancel",
-    "إخفاء": "Dismiss",
-    "فتح الملف": "Open file",
-    "أُضيف إلى قائمة التنزيل ✓": "Added to downloads ✓",
-    "ألصق رابطًا صحيحًا يبدأ بـ https://": "Paste a valid link starting with https://",
-    "أكّد أن لديك الحق في تنزيل هذا المحتوى.": "Confirm you have the right to download this content.",
-    "صيغة وقت القص غير صحيحة. مثال: 1:30": "Invalid trim time. Example: 1:30",
-    "تم لصق الرابط من الحافظة.": "Link pasted from clipboard.",
-    "تم استلام الرابط. اختر الصيغة وأضفه للتنزيل.": "Link received. Pick a format and add it.",
-    "الخدمة غير متصلة": "Service offline",
-    "جارٍ التحديث…": "Updating…",
-    "مُحدَّث ✓": "Updated ✓",
-    "فشل": "Failed",
-    "فشل الطلب": "Request failed",
-    "فشل التحديث": "Update failed",
-    "تعذر إكمال العملية": "Couldn't complete the download",
-    "تعذر إكمال العملية.": "Couldn't complete the download.",
-    "لم يُنشأ أي ملف.": "No file was produced.",
-    "يجب تأكيد امتلاك حق التنزيل.": "Please confirm you have the right to download.",
-    "الرابط غير صالح. استخدم رابطًا يبدأ بـ https://": "Invalid link. Use a link starting with https://",
-    "هذا الموقع أو الرابط غير مدعوم.": "This site or link isn't supported.",
-    "المحتوى خاص أو يتطلب تسجيل الدخول.": "This content is private or requires sign-in. Try browser cookies in Settings.",
-    "المقطع غير متاح.": "This video is unavailable.",
-    "الرابط غير موجود. تأكد منه وحاول مجددًا.": "Link not found. Check it and try again.",
-    "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.": "Couldn't connect. Check your internet and retry.",
-    "رفض الموقع الطلب. جرّب تحديث محرك التنزيل من الإعدادات.": "The site refused the request. Try updating the download engine in Settings.",
-    "الملف غير موجود. ربما نُقل أو حُذف.": "File not found. It may have been moved or deleted.",
-    "افتح الملف من مجلد التنزيلات/Nazzil.": "Open the file from Downloads/Nazzil.",
-    "تعذر تهيئة yt-dlp على هذا الجهاز.": "Couldn't start yt-dlp on this device.",
-    "تعذر الحفظ في التنزيلات.": "Couldn't save to Downloads.",
-  };
-
+  // The most used languages among Android users worldwide. [code, native name, direction]
+  const LANGS = [
+    ["ar", "العربية", "rtl"], ["en", "English"], ["es", "Español"], ["pt", "Português"], ["fr", "Français"],
+    ["de", "Deutsch"], ["it", "Italiano"], ["ru", "Русский"], ["tr", "Türkçe"], ["id", "Bahasa Indonesia"],
+    ["hi", "हिन्दी"], ["bn", "বাংলা"], ["ur", "اردو", "rtl"], ["fa", "فارسی", "rtl"], ["vi", "Tiếng Việt"],
+    ["th", "ไทย"], ["ja", "日本語"], ["ko", "한국어"], ["zh", "中文（简体）"],
+  ];
+  const CODES = LANGS.map(l => l[0]);
+  const dicts = {};
   const original = new WeakMap();
-  // Saved choice wins; otherwise follow the system language (Arabic systems get Arabic, everyone else English).
-  let saved = null;
-  try { saved = localStorage.getItem("nazil.lang"); } catch {}
-  let lang = saved || ((navigator.language || "").toLowerCase().startsWith("ar") ? "ar" : "en");
 
-  /** Translate an Arabic source string (untranslated strings pass through unchanged). */
+  // Saved choice wins; otherwise the first device language we support; otherwise English.
+  function detect() {
+    let saved = null;
+    try { saved = localStorage.getItem("nazil.lang"); } catch {}
+    if (saved && CODES.includes(saved)) return saved;
+    const prefs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"]);
+    for (const p of prefs) {
+      const code = String(p).toLowerCase().split(/[-_]/)[0];
+      if (code === "zh" && /tw|hk|mo|hant/i.test(p)) continue; // Traditional Chinese isn't provided
+      if (CODES.includes(code)) return code;
+    }
+    return "en";
+  }
+  let lang = detect();
+  const isTranslatable = k => !!(dicts.en && dicts.en[k]);
+
+  /** Translate an Arabic source string (falls back to English, then to the source). */
   function t(s) {
-    if (lang !== "en" || s == null) return s;
+    if (s == null || lang === "ar") return s;
     const k = String(s).trim();
-    return EN[k] ?? s;
+    return (dicts[lang] && dicts[lang][k]) || (dicts.en && dicts.en[k]) || s;
   }
 
   function translatePage() {
+    const def = LANGS.find(l => l[0] === lang) || LANGS[1];
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === "en" ? "ltr" : "rtl";
+    document.documentElement.dir = def[2] || "ltr";
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (n.parentElement.closest("[data-no-i18n]")) continue;
       if (!original.has(n)) {
-        const k = n.nodeValue.trim();
-        if (!EN[k]) continue;
+        if (!isTranslatable(n.nodeValue.trim())) continue;
         original.set(n, n.nodeValue);
       }
       const src = original.get(n);
-      n.nodeValue = lang === "en" ? src.replace(src.trim(), EN[src.trim()]) : src;
+      n.nodeValue = lang === "ar" ? src : src.replace(src.trim(), t(src.trim()));
     }
     for (const el of document.querySelectorAll("[placeholder],[title],[aria-label]")) {
       for (const attr of ["placeholder", "title", "aria-label"]) {
         if (!el.hasAttribute(attr)) continue;
         const key = "i18n" + attr.replace(/-(\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, c => c.toUpperCase());
-        if (!(key in el.dataset)) { if (!EN[el.getAttribute(attr)]) continue; el.dataset[key] = el.getAttribute(attr); }
+        if (!(key in el.dataset)) { if (!isTranslatable(el.getAttribute(attr))) continue; el.dataset[key] = el.getAttribute(attr); }
         el.setAttribute(attr, t(el.dataset[key]));
       }
     }
@@ -258,8 +64,11 @@
   }
 
   window.NzI18n = {
-    t, translatePage,
+    t, translatePage, LANGS,
+    add(code, dict) { dicts[code] = Object.assign(dicts[code] || {}, dict); },
+    has: code => code === "ar" || !!dicts[code],
     get lang() { return lang; },
-    set(l) { lang = l === "en" ? "en" : "ar"; try { localStorage.setItem("nazil.lang", lang); } catch {} translatePage(); },
+    get dir() { return (LANGS.find(l => l[0] === lang) || [])[2] || "ltr"; },
+    set(l) { lang = CODES.includes(l) ? l : "en"; try { localStorage.setItem("nazil.lang", lang); } catch {} translatePage(); },
   };
 })();

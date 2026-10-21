@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">下载</string>
+    <string name="channel_finished">已完成的下载</string>
+    <string name="download_done">下载完成</string>
+    <string name="download_failed">下载失败</string>
+    <plurals name="downloads_running">
+        <item quantity="other">Nazzil · %d 个下载进行中</item>
+    </plurals>
+</resources>

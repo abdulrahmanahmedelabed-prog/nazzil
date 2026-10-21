@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">نزّل</string>
+    <string name="channel_downloads">التنزيلات</string>
+    <string name="channel_finished">اكتمال التنزيل</string>
+    <string name="download_done">اكتمل التنزيل</string>
+    <string name="download_failed">فشل التنزيل</string>
+    <plurals name="downloads_running">
+        <item quantity="zero">نزّل · لا تنزيلات جارية</item>
+        <item quantity="one">نزّل · تنزيل واحد جارٍ</item>
+        <item quantity="two">نزّل · تنزيلان جاريان</item>
+        <item quantity="few">نزّل · %d تنزيلات جارية</item>
+        <item quantity="many">نزّل · %d تنزيلًا جاريًا</item>
+        <item quantity="other">نزّل · %d تنزيل جارٍ</item>
+    </plurals>
+</resources>

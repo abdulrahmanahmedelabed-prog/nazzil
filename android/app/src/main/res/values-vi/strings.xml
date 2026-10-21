@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_downloads">Tải xuống</string>
+    <string name="channel_finished">Lượt tải đã xong</string>
+    <string name="download_done">Đã tải xong</string>
+    <string name="download_failed">Tải xuống thất bại</string>
+    <plurals name="downloads_running">
+        <item quantity="other">Nazzil · %d lượt tải đang chạy</item>
+    </plurals>
+</resources>
