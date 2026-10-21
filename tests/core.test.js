@@ -127,8 +127,9 @@ test("English translation covers every Arabic string in the page and app", () =>
   const noI18n = /data-no-i18n/;
   const texts = [...html.matchAll(/<([a-z0-9]+)([^>]*)>([^<>]*[؀-ۿ][^<>]*)</g)].filter(m => !noI18n.test(m[2])).map(m => m[3].trim());
   const attrs = [...html.matchAll(/(?:placeholder|aria-label|title)="([^"]*[؀-ۿ][^"]*)"/g)].map(m => m[1]);
-  const app = read("web/app.js");
-  const dynamic = [...app.matchAll(/(?:\bt|toast|emptyState)\((?:"[^"]*",\s*)?"([^"]*[؀-ۿ][^"]*)"/g)].map(m => m[1]);
+  // Every Arabic string literal in the app is shown somewhere (often via a variable), so all must translate.
+  const app = read("web/app.js").split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+  const dynamic = [...app.matchAll(/"([^"\n]*[؀-ۿ][^"\n]*)"/g)].map(m => m[1]);
   const missing = [...new Set([...texts, ...attrs, ...dynamic])].filter(s => t(s) === s);
   assert.deepEqual(missing, []);
 });

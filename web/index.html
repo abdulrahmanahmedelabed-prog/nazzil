@@ -40,6 +40,8 @@
     <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m10 12 5 3-5 3z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.2 5.3 3.1 1.7-1.9 3.2-3.1 5.3-3.1 3.7 0 5.8 3.8 4.3 7.3C19.5 16.4 12 21 12 21z"/></symbol>
     <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
   </defs>
 </svg>
@@ -115,6 +117,7 @@
           <span class="tabs-spacer"></span>
           <button type="button" id="openFolderTop" class="icon-btn sm" title="فتح مجلد التنزيلات" aria-label="فتح مجلد التنزيلات"><svg><use href="#i-folder"/></svg></button>
         </div>
+        <div class="nudge" id="nudge" hidden><svg><use href="#i-heart"/></svg><span>يعجبك نزّل؟ ادعمه ليبقى مجانيًا بلا إعلانات.</span><button type="button" id="nudgeYes" class="btn primary sm">ادعم</button><button type="button" id="nudgeLater" class="btn ghost sm">لاحقًا</button></div>
         <div id="queue" class="list" role="tabpanel"></div>
         <div id="historyPane" class="list" role="tabpanel" hidden>
           <div class="history-tools">
@@ -211,6 +214,11 @@
   <dialog id="settings" class="dialog">
     <form method="dialog">
       <div class="dlg-head"><h3>الإعدادات</h3><button class="icon-btn sm" value="close" aria-label="إغلاق"><svg><use href="#i-x"/></svg></button></div>
+      <section class="support" id="supportBox" aria-labelledby="supportTitle">
+        <div class="support-head"><svg><use href="#i-heart"/></svg><div><b id="supportTitle">ادعم نزّل</b><small id="supportText">نزّل مجاني بلا إعلانات. دعمك يبقيه كذلك ويفتح ألوان الواجهة.</small></div></div>
+        <div class="support-actions" id="supportActions"></div>
+        <div class="accent-row"><span>لون الواجهة</span><div class="accents" id="accents" role="radiogroup" aria-label="لون الواجهة"></div></div>
+      </section>
       <div class="set-row" id="folderRow"><div><b>مجلد الحفظ</b><small id="folderPath">—</small></div><button type="button" id="pickFolder" class="btn ghost sm">تغيير</button><button type="button" id="openFolder" class="btn ghost sm">فتح</button></div>
       <div class="set-row"><div><b>التنزيلات المتزامنة</b><small>عدد الملفات التي تُنزّل في نفس الوقت</small></div><select id="parallel"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
       <div class="set-row"><div><b>حد السرعة</b><small>لترك الإنترنت متاحًا لبقية الأجهزة</small></div><select id="rate"><option value="">بلا حد</option><option value="500K">500 KB/s</option><option value="1M">1 MB/s</option><option value="2M">2 MB/s</option><option value="5M">5 MB/s</option><option value="10M">10 MB/s</option></select></div>

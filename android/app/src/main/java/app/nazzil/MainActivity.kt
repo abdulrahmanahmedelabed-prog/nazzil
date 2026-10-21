@@ -160,6 +160,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Delivers an RPC result back to the page. */
+    fun js(code: String) = runOnUiThread { web.evaluateJavascript(code, null) }
+
     fun reply(id: Int, json: String) = runOnUiThread {
         web.evaluateJavascript("window.__nzReply($id, ${JSONObject.quote(json)})", null)
     }

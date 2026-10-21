@@ -284,3 +284,35 @@ label.set-row{cursor:pointer}
 .formats input:disabled+span{opacity:.35;cursor:not-allowed}
 ol.notice-list{padding-inline-start:22px}
 @media(max-width:520px){.takeout-link span{display:none}}
+
+/* ===== Accent colors (supporter reward) ===== */
+body[data-accent="sky"]{--accent:#7cc8ff;--accent-2:#4aaef5;--accent-ink:#04121c;--accent-text:#8fd0ff;--accent-soft:#7cc8ff1a;--focus:0 0 0 3px #7cc8ff55;background:radial-gradient(1200px 600px at 85% -10%,#16304a66,transparent 60%),var(--bg)}
+body.light[data-accent="sky"]{--accent:#8fd0ff;--accent-2:#5ab6f5;--accent-text:#0b5c8f;--accent-soft:#0b5c8f1a;--focus:0 0 0 3px #0b5c8f55;background:radial-gradient(1200px 600px at 85% -10%,#d6ecfb,transparent 60%),var(--bg)}
+body[data-accent="violet"]{--accent:#c0abff;--accent-2:#9f86ff;--accent-ink:#140b2e;--accent-text:#c9b8ff;--accent-soft:#c0abff1a;--focus:0 0 0 3px #c0abff55;background:radial-gradient(1200px 600px at 85% -10%,#2c1f4f66,transparent 60%),var(--bg)}
+body.light[data-accent="violet"]{--accent:#c9b8ff;--accent-2:#a68fff;--accent-text:#5b3fc4;--accent-soft:#5b3fc41a;--focus:0 0 0 3px #5b3fc455;background:radial-gradient(1200px 600px at 85% -10%,#e8e0fd,transparent 60%),var(--bg)}
+body[data-accent="rose"]{--accent:#ff9cbc;--accent-2:#ff6f9c;--accent-ink:#2a0a14;--accent-text:#ffa7c3;--accent-soft:#ff9cbc1a;--focus:0 0 0 3px #ff9cbc55;background:radial-gradient(1200px 600px at 85% -10%,#4a1a2a66,transparent 60%),var(--bg)}
+body.light[data-accent="rose"]{--accent:#ffb0c8;--accent-2:#ff7ea6;--accent-text:#b4234f;--accent-soft:#b4234f1a;--focus:0 0 0 3px #b4234f55;background:radial-gradient(1200px 600px at 85% -10%,#fbe0e8,transparent 60%),var(--bg)}
+body[data-accent="amber"]{--accent:#ffcf5c;--accent-2:#f5b324;--accent-ink:#231800;--accent-text:#ffd56f;--accent-soft:#ffcf5c1a;--focus:0 0 0 3px #ffcf5c55;background:radial-gradient(1200px 600px at 85% -10%,#4a361066,transparent 60%),var(--bg)}
+body.light[data-accent="amber"]{--accent:#ffd56f;--accent-2:#f5b82e;--accent-text:#8a5a00;--accent-soft:#8a5a001a;--focus:0 0 0 3px #8a5a0055;background:radial-gradient(1200px 600px at 85% -10%,#fbefcc,transparent 60%),var(--bg)}
+body[data-accent="teal"]{--accent:#6eeedb;--accent-2:#2dd4bf;--accent-ink:#042420;--accent-text:#7af0de;--accent-soft:#6eeedb1a;--focus:0 0 0 3px #6eeedb55;background:radial-gradient(1200px 600px at 85% -10%,#123f3a66,transparent 60%),var(--bg)}
+body.light[data-accent="teal"]{--accent:#7ef0de;--accent-2:#36d7c2;--accent-text:#0f6f63;--accent-soft:#0f6f631a;--focus:0 0 0 3px #0f6f6355;background:radial-gradient(1200px 600px at 85% -10%,#d3f6ef,transparent 60%),var(--bg)}
+
+/* ===== Support ===== */
+.support{display:grid;gap:12px;margin:4px 0 6px;padding:14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--accent-soft),transparent 70%)}
+.support-head{display:flex;gap:10px;align-items:flex-start}
+.support-head>svg{color:var(--accent-text);margin-top:2px;fill:currentColor}
+.support-head>div{display:grid;gap:2px;min-width:0}
+.support-head small{color:var(--muted);font-size:12px}
+.support-actions{display:flex;flex-wrap:wrap;gap:8px}
+.support-actions:empty{display:none}
+.support-actions .btn{flex:1 1 auto}
+.accent-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:700;font-size:12.5px}
+.accents{display:flex;gap:8px}
+.swatch{position:relative;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;border:2px solid transparent;padding:0;color:#0008}
+.swatch[aria-checked="true"]{border-color:var(--text)}
+.swatch[data-locked] svg{width:13px;height:13px}
+.swatch[data-c="lime"]{background:#c4f55e}.swatch[data-c="sky"]{background:#7cc8ff}.swatch[data-c="violet"]{background:#c0abff}
+.swatch[data-c="rose"]{background:#ff9cbc}.swatch[data-c="amber"]{background:#ffcf5c}.swatch[data-c="teal"]{background:#6eeedb}
+.nudge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 12px 0;padding:10px 12px;border-radius:var(--radius-sm);background:var(--accent-soft);border:1px solid var(--line)}
+.nudge>svg{color:var(--accent-text);fill:currentColor}
+.nudge span{flex:1 1 180px;min-width:0;font-weight:700;font-size:12.5px}

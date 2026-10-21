@@ -42,7 +42,20 @@ Nazzil Open only downloads from sources whose terms or licenses permit downloadi
 
 ## Data safety
 - Data collected: **None**. Data shared: **None**. No account, no analytics, no ads SDK.
+- Optional tips go through Google Play Billing. Google processes the payment; the app only keeps a "supporter" flag on the device and sends nothing anywhere.
 - Network: the sources the user chooses. Files and history stay on the device.
+
+## In-app products (Monetize → Products → In-app products)
+Create these three, all **Active**. The app reads their prices from Google Play, so set any price per country.
+
+| Product ID | Name | Suggested price | Notes |
+|---|---|---|---|
+| `tip_coffee` | Coffee ☕ | US$0.99 | Consumable tip, can be given again |
+| `supporter` | Supporter ❤ | US$2.99 | One-time, restored on reinstall |
+| `tip_gold` | Gold supporter 🌟 | US$9.99 | Consumable tip |
+
+Any of them unlocks the interface colors as a thank-you. Nothing else is locked. Requires a payments profile (Play Console → Setup → Payments profile).
+Reviewer note: "Tips are optional. All download features are free; tips only unlock cosmetic accent colors."
 
 ## Foreground service declaration (dataSync)
 Continues downloads the user started (and converts/saves them) after the user leaves the app, with an ongoing progress notification; the service stops when the queue is empty.

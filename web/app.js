@@ -1,7 +1,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const t = NzI18n.t;
-const HISTORY = "nazil.history.v1", PREFS = "nazil.prefs.v2";
+const HISTORY = "nazil.history.v1", PREFS = "nazil.prefs.v2", SUPPORTER = "nazil.supporter", DONE_COUNT = "nazil.doneCount";
 let status = {}; // filled by loadStatus(): platform, versions, store edition…
 let localFile = null; // a file from the device to convert: {path | id | webFile, name, size}
 
@@ -141,6 +141,7 @@ function applyTheme() {
   $("themeBtn").querySelector("use").setAttribute("href", light ? "#i-moon" : "#i-sun");
   document.querySelector('meta[name="theme-color"]').content = light ? "#f3f5f0" : "#0b0d11";
   if (android) rpc("theme", { light }).catch(() => {}); // match the Android status/navigation bars
+  applyAccent();
 }
 function syncKind() {
   const kind = kindOf(), audio = isAudio(kind);
@@ -313,6 +314,9 @@ function saveHistory(item) {
   const rows = [item, ...store.get(HISTORY, []).filter(x => x.file !== item.file)].slice(0, 300);
   store.set(HISTORY, rows);
   renderHistory();
+  const done = store.get(DONE_COUNT, 0) + 1;
+  store.set(DONE_COUNT, done);
+  if (NUDGE_AT.includes(done) && !isSupporter() && canSupport()) $("nudge").hidden = false;
 }
 function renderHistory() {
   const all = store.get(HISTORY, []);
@@ -504,6 +508,7 @@ async function loadStatus() {
       for (const id of ["folderRow", "loginRow", "engineRow", "openFolderTop"]) $(id).hidden = isWeb();
       $("lanRow").hidden = status.platform !== "windows";
       if (isStore()) applyStoreEdition();
+      renderSupport(); loadProducts();
       if (status.platform === "windows") refreshLan();
       rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
       checkForUpdate(status.appVersion);
@@ -588,6 +593,65 @@ $("openTakeout").addEventListener("click", () => {
   const url = "https://takeout.google.com/";
   if (android) location.href = url; else window.open(url, "_blank", "noopener");
 });
+
+/* ---------- Support: keeps Nazzil free with no ads ---------- */
+// Full edition / Windows: GitHub Sponsors. Google Play edition: Play Billing tips (prices come from Play).
+const SUPPORT_URL = "https://github.com/sponsors/abdulrahmanahmedelabed-prog";
+const ACCENTS = [["lime", "أخضر"], ["sky", "أزرق"], ["violet", "بنفسجي"], ["rose", "وردي"], ["amber", "ذهبي"], ["teal", "فيروزي"]];
+const TIERS = { tip_coffee: "قهوة", supporter: "داعم", tip_gold: "داعم ذهبي" };
+const NUDGE_AT = [10, 60, 250]; // finished downloads before a gentle "support?" banner (never for supporters)
+let products = [];
+const isSupporter = () => !!store.get(SUPPORTER, false);
+const canSupport = () => !isStore() || products.length > 0; // the Play edition needs its products from Google Play
+function applyAccent() {
+  const a = isSupporter() ? prefs.accent : "";
+  if (a && a !== "lime") document.body.dataset.accent = a; else delete document.body.dataset.accent;
+}
+function renderSupport() {
+  const fan = isSupporter();
+  $("supportBox").hidden = !canSupport() && !fan;
+  $("supportText").textContent = t(fan ? "شكرًا لدعمك ❤" : "نزّل مجاني بلا إعلانات. دعمك يبقيه كذلك ويفتح ألوان الواجهة.");
+  $("supportActions").innerHTML = products.length
+    ? products.map(p => `<button type="button" class="btn sm${p.id === "supporter" ? " primary" : ""}" data-buy="${esc(p.id)}">${esc(t(TIERS[p.id] || p.id))} · <bdi>${esc(p.price)}</bdi></button>`).join("")
+    : isStore() ? ""
+    : `<button type="button" class="btn primary sm" data-sponsor>${icon("heart")}${esc(t("ادعم على GitHub"))}</button>` + (fan ? "" : `<button type="button" class="btn sm" data-honor>${esc(t("دعمتُ نزّل"))}</button>`);
+  const current = fan ? prefs.accent || "lime" : "lime";
+  $("accents").innerHTML = ACCENTS.map(([id, name]) => {
+    const locked = !fan && id !== "lime";
+    return `<button type="button" class="swatch" role="radio" data-c="${id}" aria-checked="${current === id}" aria-label="${esc(t(name))}" title="${esc(t(name))}"${locked ? " data-locked" : ""}>${locked ? icon("lock") : ""}</button>`;
+  }).join("");
+}
+function becameSupporter() {
+  store.set(SUPPORTER, true);
+  $("nudge").hidden = true;
+  toast("شكرًا لدعمك ❤");
+  renderSupport(); applyAccent();
+}
+const openExternal = url => { if (android) location.href = url; else window.open(url, "_blank", "noopener"); };
+$("supportBox").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.buy) rpc("buy", { id: b.dataset.buy }).catch(err => toast(err.message, true));
+  else if ("sponsor" in b.dataset) openExternal(SUPPORT_URL);
+  else if ("honor" in b.dataset) becameSupporter();
+  else if (b.dataset.c) {
+    if ("locked" in b.dataset) return toast("الألوان للداعمين. ادعم نزّل لفتحها.");
+    prefs.accent = b.dataset.c; store.set(PREFS, prefs);
+    applyAccent(); renderSupport();
+  }
+});
+// Google Play answers a purchase here (ok, or failed=true when it wasn't just cancelled).
+window.nazzilPurchase = (ok, failed) => { if (ok) becameSupporter(); else if (failed) toast("تعذر إتمام الشراء.", true); };
+function loadProducts() {
+  if (!android || !isStore()) return;
+  rpc("products").then(r => {
+    products = r.products || [];
+    if (r.supporter && !isSupporter()) store.set(SUPPORTER, true); // restored from Google Play
+    renderSupport(); applyAccent();
+  }).catch(() => {});
+}
+$("nudgeYes").addEventListener("click", () => { $("nudge").hidden = true; $("settings").showModal(); $("supportBox").scrollIntoView({ block: "nearest" }); });
+$("nudgeLater").addEventListener("click", () => { $("nudge").hidden = true; });
 
 /* ---------- Store edition (Google Play: "Nazzil Open") ---------- */
 const STORE_ONLY = "هذه النسخة تنزّل من المصادر المفتوحة فقط: Internet Archive وWikimedia Commons وPeerTube والبودكاست والروابط المباشرة.";
@@ -691,6 +755,7 @@ function applyLang() {
   if (status.platform && status.yt_dlp && status.ffmpeg) $("tools").textContent = t(platformText());
   renderSummary();
   renderHistory();
+  renderSupport();
   pollJobs();
 }
 // Each language is listed in its own name, so anyone can find theirs.
