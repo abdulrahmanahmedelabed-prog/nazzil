@@ -132,6 +132,48 @@
     return lines.join("\n") + "\n";
   }
 
+  /* ---------- Converting a file from the device (no download involved) ----------
+     Used for "File from my device", files shared to the app, and Google Takeout exports. */
+  const LOCAL_KINDS = ["mp3", "m4a", "mp4"];
+  /**
+   * FFmpeg arguments to convert/trim a local media file.
+   * o: {kind, abr, from, to, meta, title}; copy=true tries a fast remux (only for untrimmed MP4).
+   */
+  function convertArgs(o, input, output, copy = false) {
+    const kind = LOCAL_KINDS.includes(o.kind) ? o.kind : "mp3";
+    const abr = ["0", "320", "192", "128"].includes(String(o.abr)) ? String(o.abr) : "0";
+    const a = ["-y", "-hide_banner", "-nostats", "-loglevel", "info", "-progress", "pipe:1"];
+    const from = TIME.test(o.from || "") ? toSeconds(o.from) : 0;
+    const to = TIME.test(o.to || "") ? toSeconds(o.to) : 0;
+    if (from) a.push("-ss", String(from));
+    a.push("-i", input);
+    if (to > from) a.push("-t", String(to - from));
+    if (kind === "mp3") a.push("-vn", "-map", "0:a:0", "-c:a", "libmp3lame", ...(abr === "0" ? ["-q:a", "0"] : ["-b:a", abr + "k"]));
+    else if (kind === "m4a") a.push("-vn", "-map", "0:a:0", "-c:a", "aac", "-b:a", "256k");
+    else if (copy) a.push("-map", "0:v:0?", "-map", "0:a:0?", "-c", "copy", "-movflags", "+faststart");
+    else a.push("-map", "0:v:0?", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart");
+    if (o.meta !== false) {
+      a.push("-map_metadata", "0");
+      if (o.title) a.push("-metadata", "title=" + String(o.title).slice(0, 200));
+    } else a.push("-map_metadata", "-1");
+    if (kind === "mp3") a.push("-id3v2_version", "3");
+    a.push(output);
+    return a;
+  }
+  /** One frame of a local video at `seconds` → JPEG (for the audio cover). */
+  const frameArgs = (src, seconds, out) => ["-y", "-loglevel", "error", "-ss", String(seconds), "-i", src, "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "2", out];
+  /** Parses FFmpeg's stderr "Duration: 00:01:02.50" and -progress "out_time_us=…" lines (seconds). */
+  function ffDuration(line) {
+    const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(line);
+    return m ? (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]) : 0;
+  }
+  function ffTime(line) {
+    const m = /^out_time_(?:us|ms)=(\d+)/.exec(String(line).trim());
+    return m ? +m[1] / 1e6 : -1;
+  }
+  /** "My video (2024).mov" → "My video (2024)" */
+  const baseTitle = name => String(name || "").replace(/\.[^.\/\\]{1,6}$/, "").slice(0, 200);
+
   /* ---------- Store edition ("Nazzil Open", Google Play) ----------
      Only sources whose terms or licenses permit downloading. Enforced in three layers:
      1) storeAllows() before anything is fetched (page + native code),
@@ -179,5 +221,6 @@
       thumbnail: j.thumbnail || "", height: Math.max(0, j.height || 0, ...heights) || 0, site };
   }
 
-  return { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds, cookieJar, storeAllows, STORE };
+  return { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds, cookieJar, storeAllows, STORE,
+    convertArgs, frameArgs, ffDuration, ffTime, baseTitle, LOCAL_KINDS };
 });

@@ -1,0 +1,11 @@
+<p>Nazzil turns a link into a ready file in one tap — everything runs on your device.</p>
+<ul>
+<li>Paste a link, share it to Nazzil from any app, or browse a platform inside the app and tap “Download with Nazzil”.</li>
+<li>1000+ sites via yt-dlp, including YouTube, Facebook, TikTok, Instagram, X, SoundCloud and Vimeo.</li>
+<li>MP3 and M4A audio; MP4 and WEBM video up to 4K, with a preview before downloading.</li>
+<li>Parallel downloads with pause and resume that keep going in the background.</li>
+<li>Convert files from your device: any video or audio to MP3, M4A or MP4, with trimming and a cover image.</li>
+<li>Add-ons: trim, whole playlists, metadata and subtitles, SponsorBlock, and your choice of audio cover (thumbnail, a frame from the video, or your own image).</li>
+<li>Arabic and English, dark and light. No accounts, no ads, no tracking.</li>
+</ul>
+<p>The download engine (yt-dlp) updates itself from GitHub to keep up with site changes. Only download what you own or have permission to download, and follow each platform's terms.</p>

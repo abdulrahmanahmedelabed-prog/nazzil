@@ -1,7 +1,7 @@
 // Local-only RPC server (127.0.0.1) that drives yt-dlp without a shell.
 const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto"), os = require("os");
 const { spawn, execFile, execFileSync } = require("child_process");
-const { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds } = require("./web/ytdlp.js");
+const { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds, convertArgs, frameArgs, ffDuration, ffTime, baseTitle, LOCAL_KINDS } = require("./web/ytdlp.js");
 
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png" };
 const EXE = process.platform === "win32" ? ".exe" : "";
@@ -24,7 +24,7 @@ function lastError(text) {
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, cookiesFile = "" }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, pickMedia = async () => null, cookiesFile = "" }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -94,6 +94,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   }
   function start(job) {
     job.state = "working";
+    if (job.opts.local) return startLocal(job);
     const tempDir = path.join(dataDir, "tmp", job.id);
     const args = buildArgs(job.opts, { outDir: settings.folder, ffmpeg, tempDir, cookiesFile: cookies(), jsRuntime });
     const p = spawn(ytdlp, args, { windowsHide: true });
@@ -145,6 +146,67 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       pump();
     });
   }
+  /** A path in the save folder that doesn't overwrite an existing file: "name.mp3", "name (1).mp3", … */
+  function freePath(dir, name, ext) {
+    for (let i = 0; i < 1000; i++) {
+      const p = path.join(dir, `${name}${i ? ` (${i})` : ""}.${ext}`);
+      if (!fs.existsSync(p)) return p;
+    }
+    return path.join(dir, `${name} ${Date.now()}.${ext}`);
+  }
+
+  /** Converts a file from the device with FFmpeg (no download): format, trim, metadata and cover. */
+  function startLocal(job) {
+    const o = job.opts, kind = o.kind;
+    fs.mkdirSync(settings.folder, { recursive: true });
+    const out = job.out || (job.out = freePath(settings.folder, baseTitle(o.name) || "Nazzil", kind));
+    // Untrimmed MP4: try a lossless remux first, fall back to re-encoding if the codecs don't fit.
+    const tryCopy = kind === "mp4" && !o.from && !o.to && !job.copyFailed;
+    const p = spawn(ffmpeg, convertArgs({ ...o, title: o.meta !== false ? baseTitle(o.name) : "" }, o.local, out, tryCopy), { windowsHide: true });
+    job.proc = p;
+    let duration = 0, err = "", buf = "";
+    Object.assign(job, { stage: "convert", progress: 0, speed: "", eta: "" });
+    p.stderr.on("data", d => { const t = d.toString(); err = (err + t).slice(-8000); if (!duration) duration = t.split(/\r?\n/).map(ffDuration).find(x => x > 0) || 0; });
+    p.stdout.on("data", d => {
+      buf += d.toString();
+      const lines = buf.split(/\r?\n/); buf = lines.pop();
+      for (const line of lines) {
+        const sec = ffTime(line);
+        if (sec >= 0 && duration) {
+          const span = o.to ? Math.min(duration, toSeconds(o.to)) - (toSeconds(o.from) || 0) : duration - (toSeconds(o.from) || 0);
+          job.progress = Math.max(0, Math.min(99, sec / Math.max(span, 0.1) * 100));
+        }
+      }
+    });
+    p.on("error", e => Object.assign(job, { state: "error", error: "تعذر تشغيل FFmpeg: " + e.message }));
+    p.on("close", async code => {
+      job.proc = null;
+      if (job.state !== "working") { fs.rm(out, { force: true }, () => {}); pump(); return; }
+      if (code !== 0 && tryCopy) { job.copyFailed = true; fs.rm(out, { force: true }, () => {}); return startLocal(job); }
+      if (code !== 0 || !fs.existsSync(out)) {
+        fs.rm(out, { force: true }, () => {});
+        Object.assign(job, { state: "error", error: lastFfError(err) });
+        notify(job.title, "error");
+        return pump();
+      }
+      if ((kind === "mp3" || kind === "m4a") && o.cover !== "none") {
+        job.stage = "cover";
+        try { await applyCover(out, "", o, job.id); } catch { job.warning = "تعذر إضافة صورة الغلاف."; }
+      }
+      job.files = [out];
+      Object.assign(job, { state: "done", progress: 100, file: out, count: 1 });
+      if (o.uploaded) fs.rm(o.local, { force: true }, () => {}); // a phone's upload is no longer needed
+      remember(out);
+      notify(job.title, "done");
+      pump();
+    });
+  }
+  function lastFfError(text) {
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(text)) return "الملف لا يحتوي على صوت أو فيديو يمكن تحويله.";
+    if (/Invalid data found|could not find codec|moov atom not found/i.test(text)) return "الملف تالف أو بصيغة غير مدعومة.";
+    return "تعذر تحويل الملف.";
+  }
+
   /** Builds the chosen cover (video frame or user image) and embeds it into an audio file. */
   async function applyCover(file, pageUrl, opts, id) {
     if (!fs.existsSync(file)) return;
@@ -152,7 +214,12 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     fs.mkdirSync(work, { recursive: true });
     try {
       const jpg = path.join(work, "cover.jpg");
-      if (coverMode(opts) === "frame") {
+      if (opts.local && opts.cover !== "custom") {
+        // Converting a local video: take the frame straight from the file (the video's "thumbnail" = a frame too).
+        for (const sec of [toSeconds(opts.coverAt) || 30, 1, 0]) {
+          if ((await run(ffmpeg, frameArgs(opts.local, sec, jpg))).ok && fs.existsSync(jpg)) break;
+        }
+      } else if (coverMode(opts) === "frame") {
         if (!pageUrl) throw new Error("no page url");
         // Try the chosen second; if the video is shorter than that, fall back to the first second.
         for (const sec of [toSeconds(opts.coverAt) || 30, 1]) {
@@ -162,7 +229,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
           if (clip && (await run(ffmpeg, coverArgs.toJpeg(path.join(work, clip), jpg))).ok && fs.existsSync(jpg)) break;
         }
       } else {
-        if (!opts.coverImage || !fs.existsSync(opts.coverImage)) throw new Error("image missing");
+        if (!opts.coverImage || !fs.existsSync(opts.coverImage)) { if (opts.local) return; throw new Error("image missing"); }
         await run(ffmpeg, coverArgs.toJpeg(opts.coverImage, jpg));
       }
       if (!fs.existsSync(jpg)) throw new Error("no cover produced");
@@ -182,7 +249,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   }
   const publicJob = j => ({ id: j.id, kind: j.opts.kind, title: j.title, state: j.state, progress: j.progress, speed: j.speed, eta: j.eta,
     item: j.item, items: j.items, stage: j.stage, file: j.file, count: j.count, error: j.error, warning: j.warning,
-    names: j.state === "done" ? j.files.map(f => path.basename(f)) : undefined });
+    names: j.state === "done" ? j.files.map(f => path.basename(f)) : undefined, local: !!j.opts.local });
 
   const methods = {
     async status(_, ctx = {}) {
@@ -218,6 +285,23 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       }
       return { ok: true };
     },
+    async pickMedia() {
+      const file = await pickMedia();
+      if (!file) return {};
+      return { path: file, name: path.basename(file), size: fs.statSync(file).size };
+    },
+    /** Convert a file from the device (or one a phone uploaded in LAN mode). */
+    async convert(body, ctx = {}) {
+      const file = String(body.file || "");
+      if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error("الملف غير موجود. ربما نُقل أو حُذف.");
+      if (ctx.remote && path.dirname(path.resolve(file)) !== uploadsDir) throw new Error("forbidden");
+      if (!LOCAL_KINDS.includes(body.kind)) throw new Error("حوّل الملفات إلى MP3 أو M4A أو MP4.");
+      const id = crypto.randomUUID();
+      const name = path.basename(String(body.name || file));
+      jobs.set(id, { id, opts: { ...body, local: file, name, uploaded: !!ctx.remote }, title: baseTitle(name), state: "queued", progress: 0, files: [] });
+      pump();
+      return { jobId: id };
+    },
     async pickImage() {
       const file = await pickImage();
       return file ? { path: file, name: path.basename(file) } : {};
@@ -230,7 +314,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     },
     async pause({ id }) {
       const j = jobs.get(id);
-      if (j && (j.state === "working" || j.state === "queued")) { j.state = "paused"; j.speed = ""; j.eta = ""; killTree(j.proc); pump(); }
+      if (j && (j.state === "working" || j.state === "queued")) { j.state = "paused"; j.speed = ""; j.eta = ""; j.progress = j.opts.local ? 0 : j.progress; killTree(j.proc); pump(); }
       return { ok: true };
     },
     // Resume a paused job or retry a failed/cancelled one.
@@ -281,9 +365,10 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
 
   // Methods a phone/tablet on the LAN may call. Everything that acts on the PC itself (opening files or
   // folders, dialogs, the in-app browser, updating the engine, LAN settings) stays local-only.
-  const REMOTE_OK = new Set(["status", "info", "download", "jobs", "cancel", "pause", "resume", "dismiss", "settings"]);
+  const REMOTE_OK = new Set(["status", "info", "download", "convert", "jobs", "cancel", "pause", "resume", "dismiss", "settings"]);
   const uploadsDir = path.join(dataDir, "uploads");
   const IMAGE_EXT = /\.(jpe?g|png|webp|bmp|gif)$/i;
+  const MEDIA_EXT = /\.(mp4|m4v|mov|mkv|webm|avi|wmv|flv|3gp|ts|mts|m2ts|mp3|m4a|aac|wav|flac|ogg|opus|wma|amr)$/i;
 
   /** Shared request handler; `remote` is true for the LAN listener (token already verified). */
   function handle(req, res, remote, ownOrigin) {
@@ -307,6 +392,21 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
           send(200, await fn(args, { remote }));
         } catch (e) { send(400, { error: String(e.message || e) }); }
       });
+      return;
+    }
+    // Media upload from a phone browser (LAN mode) for "File from my device": streamed to disk, 4 GB max.
+    if (u.pathname === "/upload-media" && req.method === "POST") {
+      if (!sameOrigin) return send(403, { error: "forbidden" });
+      const name = path.basename(decodeURIComponent(String(req.headers["x-name"] || "media")));
+      if (!MEDIA_EXT.test(name)) return send(400, { error: "ملفات الصوت والفيديو فقط." });
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      const dest = path.join(uploadsDir, crypto.randomUUID() + path.extname(name).toLowerCase());
+      const ws = fs.createWriteStream(dest);
+      let size = 0, aborted = false;
+      req.on("data", c => { size += c.length; if (size > 4 * 1024 ** 3 && !aborted) { aborted = true; req.destroy(); ws.destroy(); fs.rm(dest, { force: true }, () => {}); } });
+      req.pipe(ws);
+      ws.on("finish", () => { if (!aborted) send(200, { path: dest, name, size }); });
+      ws.on("error", () => { if (!aborted) send(500, { error: "upload failed" }); });
       return;
     }
     // Cover image upload from a browser (phone): raw bytes, name in a header, images only, 15 MB max.

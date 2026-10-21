@@ -32,6 +32,24 @@ class MainActivity : AppCompatActivity() {
     private var loaded = false
     @Volatile private var imageResult: CompletableFuture<Uri?>? = null
     private val imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri -> imageResult?.complete(uri) }
+    @Volatile private var mediaResult: CompletableFuture<Uri?>? = null
+    private val mediaPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> mediaResult?.complete(uri) }
+
+    /** Name and size of a content Uri (for the file card). */
+    private fun describe(uri: Uri): Pair<String, Long> =
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst()) (c.getString(0) ?: "media") to (if (c.isNull(1)) 0L else c.getLong(1)) else null
+        } ?: ("media" to 0L)
+
+    /** Lets the user pick a video/audio file to convert (background thread; blocks until chosen or cancelled). */
+    fun pickMedia(): Triple<Uri, String, Long>? {
+        val future = CompletableFuture<Uri?>()
+        mediaResult = future
+        runOnUiThread { mediaPicker.launch(arrayOf("video/*", "audio/*")) }
+        val uri = future.get() ?: return null
+        val (name, size) = describe(uri)
+        return Triple(uri, name, size)
+    }
 
     /**
      * Lets the user pick a cover image (called from a background thread; blocks until they choose or cancel).
@@ -101,8 +119,21 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleShare(intent) }
 
+    private var pendingFile: JSONObject? = null
+
     private fun handleShare(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
+        // A video/audio file shared from the gallery or a file manager → convert it.
+        val type = intent.type ?: ""
+        if (type.startsWith("video/") || type.startsWith("audio/")) {
+            @Suppress("DEPRECATION")
+            val uri = (if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                       else intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri) ?: return
+            val (name, size) = describe(uri)
+            pendingFile = JSONObject().put("id", Downloads.registerLocal(uri, name)).put("name", name).put("size", size)
+            if (loaded) deliverSharedUrl()
+            return
+        }
         val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
         // Pass the whole shared text; the page extracts every link from it.
         if (!text.contains("http")) return
@@ -134,6 +165,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun deliverSharedUrl() {
+        pendingFile?.let { f -> pendingFile = null; web.evaluateJavascript("window.nazzilSetFile && window.nazzilSetFile($f)", null) }
         val url = pendingUrl ?: return
         pendingUrl = null
         web.evaluateJavascript("window.nazzilSetUrl && window.nazzilSetUrl(${JSONObject.quote(url)})", null)

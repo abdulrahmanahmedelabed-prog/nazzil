@@ -28,7 +28,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * leaving the app. DownloadService keeps the process in the foreground while work is active.
  */
 object Downloads {
-    class Job(val id: String, val kind: String, val title: String, val args: List<String>, val cover: JSONObject?) {
+    class Job(val id: String, val kind: String, val title: String, val args: List<String>, val cover: JSONObject?,
+              val local: Uri? = null, val localName: String = "", val plan: JSONObject? = null) {
+        @Volatile var proc: Process? = null
         val pages = ConcurrentHashMap<String, String>()
         @Volatile var lastPage = ""
         val info: JSONObject = JSONObject().put("id", id).put("kind", kind).put("title", title).put("state", "queued").put("progress", 0)
@@ -46,6 +48,22 @@ object Downloads {
     fun init(context: Context) { app = context.applicationContext }
 
     private fun workDir(id: String) = File(app.cacheDir, "jobs/$id")
+
+    /** Files picked or shared into the app, by id (the page only ever sees the id). */
+    val localFiles = ConcurrentHashMap<String, Pair<Uri, String>>()
+    fun registerLocal(uri: Uri, name: String): String = UUID.randomUUID().toString().also { localFiles[it] = uri to name }
+
+    /** Convert a file from the device with the given FFmpeg plan (built by the page from web/ytdlp.js). */
+    fun addLocal(fileId: String, kind: String, plan: JSONObject): String {
+        val (uri, name) = localFiles[fileId] ?: throw Exception("الملف غير موجود. ربما نُقل أو حُذف.")
+        if (kind !in listOf("mp3", "m4a", "mp4")) throw Exception("حوّل الملفات إلى MP3 أو M4A أو MP4.")
+        val id = UUID.randomUUID().toString()
+        jobs[id] = Job(id, kind, name.substringBeforeLast('.').take(200), emptyList(), null, uri, name, plan)
+        jobs[id]!!.set("local" to true)
+        order.add(id)
+        pump()
+        return id
+    }
 
     fun add(kind: String, title: String, args: List<String>, cover: JSONObject? = null): String {
         val id = UUID.randomUUID().toString()
@@ -82,6 +100,8 @@ object Downloads {
         j.stopRequested = true
         j.set("state" to newState, "speed" to "", "eta" to "")
         runCatching { YoutubeDL.getInstance().destroyProcessById(id) }
+        j.proc?.destroy()
+        if (j.local != null && newState == "paused") j.set("progress" to 0) // a conversion restarts from the beginning
         pump()
     }
 
@@ -113,6 +133,7 @@ object Downloads {
     }
 
     private fun run(job: Job) {
+        if (job.local != null) return runLocal(job)
         val work = workDir(job.id).apply { mkdirs() }
         try {
             while (!Tools.ready) Thread.sleep(200)
@@ -256,14 +277,86 @@ object Downloads {
     }
 
     /** Runs the FFmpeg bundled by youtubedl-android (same binary and library path yt-dlp uses). */
-    private fun ffmpeg(args: List<String>): Boolean {
+    private fun ffmpeg(args: List<String>, job: Job? = null, onLine: ((String) -> Unit)? = null): Boolean {
         val packages = File(app.noBackupFilesDir, "youtubedl-android/packages")
         val bin = File(app.applicationInfo.nativeLibraryDir, "libffmpeg.so")
         val pb = ProcessBuilder(listOf(bin.absolutePath) + args).redirectErrorStream(true)
         pb.environment()["LD_LIBRARY_PATH"] = "${File(packages, "python").absolutePath}/usr/lib:${File(packages, "ffmpeg").absolutePath}/usr/lib"
         val p = pb.start()
-        p.inputStream.bufferedReader().use { it.readText() }
-        return p.waitFor() == 0
+        job?.proc = p
+        p.inputStream.bufferedReader().useLines { lines -> lines.forEach { onLine?.invoke(it) } }
+        val ok = p.waitFor() == 0
+        job?.proc = null
+        return ok
+    }
+
+    private val DURATION = Regex("""Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)""")
+    private val OUT_TIME = Regex("""^out_time_(?:us|ms)=(\d+)""")
+    private fun JSONArray?.strings(): List<String> = this?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
+
+    /** Converts a picked/shared file: copy it in, run FFmpeg (with progress), add the cover, save to Downloads. */
+    private fun runLocal(job: Job) {
+        val work = workDir(job.id).apply { deleteRecursively(); mkdirs() }
+        try {
+            val plan = job.plan ?: throw Exception("تعذر تحويل الملف.")
+            job.set("stage" to "convert", "progress" to 0, "speed" to "", "eta" to "")
+            val ext = job.localName.substringAfterLast('.', "mp4").lowercase().take(5)
+            val input = File(work, "in.$ext")
+            app.contentResolver.openInputStream(job.local!!)?.use { i -> input.outputStream().use { i.copyTo(it) } }
+                ?: throw Exception("الملف غير موجود. ربما نُقل أو حُذف.")
+            val output = File(work, job.title.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "Nazzil" } + "." + job.kind)
+            var duration = 0.0
+            val onLine = { line: String ->
+                if (duration == 0.0) DURATION.find(line)?.let { m -> duration = m.groupValues[1].toDouble() * 3600 + m.groupValues[2].toDouble() * 60 + m.groupValues[3].toDouble() }
+                OUT_TIME.find(line.trim())?.let { m -> if (duration > 0) job.set("progress" to (m.groupValues[1].toDouble() / 1e6 / duration * 100).coerceIn(0.0, 99.0)) }
+                Unit
+            }
+            fun args(key: String) = plan.optJSONArray(key).strings().map { it.replace("__IN__", input.absolutePath).replace("__OUT__", output.absolutePath) }
+            // Untrimmed MP4: lossless remux first; re-encode only if the codecs don't fit.
+            var ok = plan.optJSONArray("copy")?.let { ffmpeg(args("copy"), job, onLine) } ?: false
+            if (!ok && !job.stopRequested) { output.delete(); ok = ffmpeg(args("convert"), job, onLine) }
+            if (job.stopRequested) return
+            if (!ok || !output.exists() || output.length() == 0L) throw Exception("الملف تالف أو بصيغة غير مدعومة.")
+            plan.optJSONObject("cover")?.let { c ->
+                job.set("stage" to "cover")
+                if (!runCatching { localCover(output, input, c, work) }.getOrDefault(false)) job.set("warning" to "تعذر إضافة صورة الغلاف.")
+            }
+            val uri = publish(output, "")
+            saved[output.name] = uri
+            job.set("state" to "done", "progress" to 100, "file" to output.name, "count" to 1, "speed" to "", "eta" to "")
+            notifyFinished(job, true)
+        } catch (e: Exception) {
+            if (!job.stopRequested) {
+                job.set("state" to "error", "error" to (e.message ?: "تعذر تحويل الملف."))
+                notifyFinished(job, false)
+            }
+        } finally {
+            work.deleteRecursively()
+            pump()
+        }
+    }
+
+    /** Cover for a converted audio file: a frame of the source video, or the user's own image. */
+    private fun localCover(audio: File, source: File, c: JSONObject, work: File): Boolean {
+        val jpg = File(work, "cover.jpg")
+        fun sub(a: List<String>) = a.map { it.replace("__SRC__", source.absolutePath).replace("__JPG__", jpg.absolutePath) }
+        if (c.optString("mode") == "custom") {
+            val img = File(c.optString("image"))
+            if (!img.exists()) return false
+            ffmpeg(c.optJSONArray("toJpeg").strings().map { it.replace("__SRC__", img.absolutePath).replace("__JPG__", jpg.absolutePath) })
+        } else {
+            val frames = c.optJSONArray("frames")
+            for (i in 0 until (frames?.length() ?: 0)) {
+                if (ffmpeg(sub(frames!!.getJSONArray(i).strings())) && jpg.exists()) break
+            }
+        }
+        if (!jpg.exists()) return false
+        val out = File(work, "covered." + audio.extension)
+        val token = "__AUDIO__." + audio.extension
+        val ok = ffmpeg(c.optJSONArray("embed").strings().map { it.replace(token, audio.absolutePath).replace("__JPG__", jpg.absolutePath).replace("__OUT__", out.absolutePath) })
+        if (!ok || !out.exists() || out.length() == 0L) return false
+        out.copyTo(audio, overwrite = true)
+        return true
     }
 
     /** One notification per finished job, so the user knows even when the app is in the background. */

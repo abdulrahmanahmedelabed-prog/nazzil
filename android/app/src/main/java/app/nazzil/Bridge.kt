@@ -69,6 +69,13 @@ class Bridge(private val activity: MainActivity) {
         "settings" -> { a.optInt("parallel", 3).takeIf { it in 1..5 }?.let { Downloads.parallel = it }; Downloads.pump(); ok() }
         "open" -> { open(a.optString("file")); ok() }
         "pickFolder" -> JSONObject().put("folder", "Download/Nazzil")
+        "pickMedia" -> activity.pickMedia()?.let { (uri, name, size) ->
+            JSONObject().put("id", Downloads.registerLocal(uri, name)).put("name", name).put("size", size)
+        } ?: JSONObject()
+        "convert" -> {
+            val plan = a.optJSONObject("plan") ?: throw Exception("تعذر تحويل الملف.")
+            JSONObject().put("jobId", Downloads.addLocal(a.optString("fileId"), a.optString("kind", "mp3"), plan))
+        }
         "pickImage" -> activity.pickImage()?.let { (path, name) -> JSONObject().put("path", path).put("name", name) } ?: JSONObject()
         "update" -> {
             // Google Play forbids apps from downloading executable code; the store edition updates through Play.

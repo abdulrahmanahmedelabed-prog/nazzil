@@ -61,6 +61,12 @@ app.whenReady().then(async () => {
     cookiesFile: cookiesFile(),
     appVersion: app.getVersion(),
     browse: site => openBrowser(site),
+    pickMedia: async () => {
+      const r = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [
+        { name: "Video & audio", extensions: ["mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "flv", "3gp", "ts", "mts", "m2ts", "mp3", "m4a", "aac", "wav", "flac", "ogg", "opus", "wma", "amr"] },
+        { name: "All files", extensions: ["*"] }] });
+      return r.canceled ? null : r.filePaths[0];
+    },
     pickImage: async () => {
       const r = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "webp", "bmp", "gif"] }] });
       return r.canceled ? null : r.filePaths[0];

@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 const t = NzI18n.t;
 const HISTORY = "nazil.history.v1", PREFS = "nazil.prefs.v2";
 let status = {}; // filled by loadStatus(): platform, versions, store edition…
+let localFile = null; // a file from the device to convert: {path | id | webFile, name, size}
 
 /* ---------- Platform bridge ----------
    One async RPC for every platform:
@@ -36,6 +37,21 @@ function rpc(method, args = {}) {
           embed: c.embed("__AUDIO__." + args.kind, "__JPG__", "__OUT__"),
         };
       }
+    }
+    if (method === "convert") {
+      // Native code runs these FFmpeg steps on a copy of the picked/shared file.
+      const y = NzYtdlp, o = { ...args, title: args.meta !== false ? y.baseTitle(args.name) : "" };
+      const audio = args.kind === "mp3" || args.kind === "m4a", sec = y.toSeconds(args.coverAt) || 30;
+      args = { ...args, plan: {
+        convert: y.convertArgs(o, "__IN__", "__OUT__", false),
+        copy: args.kind === "mp4" && !args.from && !args.to ? y.convertArgs(o, "__IN__", "__OUT__", true) : null,
+        cover: audio && args.cover !== "none" ? {
+          mode: args.cover === "custom" ? "custom" : "frame", image: args.coverImage || "",
+          frames: [sec, 1, 0].map(x => y.frameArgs("__SRC__", x, "__JPG__")),
+          toJpeg: y.coverArgs.toJpeg("__SRC__", "__JPG__"),
+          embed: y.coverArgs.embed("__AUDIO__." + args.kind, "__JPG__", "__OUT__"),
+        } : null,
+      } };
     }
     if (method === "info") {
       const url = NzYtdlp.validUrl(args.url);
@@ -128,7 +144,7 @@ function applyTheme() {
 }
 function syncKind() {
   const kind = kindOf(), audio = isAudio(kind);
-  $("videoQ").classList.toggle("off", audio);
+  $("videoQ").classList.toggle("off", audio || !!localFile); // a local file keeps its own resolution
   $("audioQ").classList.toggle("off", kind !== "mp3");
   $("coverBox").hidden = !audio;
   $("subsRow").hidden = audio;
@@ -256,7 +272,7 @@ function renderJobs(jobs) {
     const pct = Math.max(0, Math.min(100, j.progress || 0));
     let line;
     if (j.state === "queued") line = `<span>${t("في الانتظار…")}</span>`;
-    else if (j.state === "working") line = `<span>${j.stage === "cover" ? t("جارٍ إضافة الغلاف…") : j.stage === "post" ? t("جارٍ التحويل…") : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
+    else if (j.state === "working") line = `<span>${j.stage === "cover" ? t("جارٍ إضافة الغلاف…") : j.stage === "post" ? t("جارٍ التحويل…") : j.stage === "convert" ? t("جارٍ التحويل") + " · " + pct.toFixed(0) + "%" : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
     else if (j.state === "paused") line = `<span>${t("متوقف مؤقتًا")} · ${pct.toFixed(0)}%</span>`;
     else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}${j.warning ? ` · ${esc(t(j.warning))}` : ""}</span>` + (isWeb()
       ? `<span class="dl-links">${(j.names || []).map((n, i) => `<a href="/dl/${encodeURIComponent(j.id)}/${i}" download="${esc(n)}" title="${esc(n)}">${j.count > 1 ? i + 1 : t("تنزيل إلى هذا الجهاز")}</a>`).join("")}</span>`
@@ -266,7 +282,7 @@ function renderJobs(jobs) {
     const b = (act, ic, label) => `<button type="button" data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon(ic)}</button>`;
     const active = j.state === "queued" || j.state === "working";
     const btn = '<span class="job-actions">' + (
-      active ? b("pause", "pause", "إيقاف مؤقت") + b("cancel", "x", "إلغاء")
+      active ? (j.local ? "" : b("pause", "pause", "إيقاف مؤقت")) + b("cancel", "x", "إلغاء")
       : j.state === "paused" ? b("resume", "play", "استئناف") + b("cancel", "x", "إلغاء")
       : j.state === "done" ? b("dismiss", "x", "إخفاء")
       : b("resume", "retry", "إعادة المحاولة") + b("dismiss", "x", "إخفاء")) + "</span>";
@@ -318,6 +334,7 @@ function parseTime(v) {
 }
 $("form").addEventListener("submit", async e => {
   e.preventDefault();
+  if (localFile) return convertLocal();
   const urls = extractUrls($("url").value);
   const url = urls[0] || $("url").value.trim();
   if (!looksLikeUrl(url)) { toast("ألصق رابطًا صحيحًا يبدأ بـ https://", true); $("url").focus(); return; }
@@ -362,7 +379,7 @@ document.addEventListener("click", e => {
   if (act) rpc(act.dataset.act, { id: act.dataset.id }).then(pollJobs, err => toast(err.message, true));
 });
 
-$("url").addEventListener("input", queueInfo);
+$("url").addEventListener("input", () => { if (localFile && $("url").value.trim()) setLocalFile(null, true); queueInfo(); });
 $("url").addEventListener("paste", e => {
   // A single-line input would glue pasted lines together; keep multiple links separated.
   const urls = extractUrls(e.clipboardData && e.clipboardData.getData("text"));
@@ -496,6 +513,82 @@ async function loadStatus() {
   $("tools").textContent = t("الخدمة غير متصلة");
 }
 
+/* ---------- File from the device (convert, no download) ---------- */
+const fmtSize = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? Math.round(b / 1e6) + " MB" : Math.max(1, Math.round(b / 1e3)) + " KB";
+function setLocalFile(f, keepUrl) {
+  localFile = f || null;
+  const box = $("preview");
+  if (localFile) {
+    if (!keepUrl) { $("url").value = ""; $("clearUrl").hidden = true; }
+    infoFor = ""; lastInfo = null;
+    box.hidden = false; box.className = "preview file";
+    box.innerHTML = `<span class="file-badge">${icon("file")}</span><div class="meta"><b>${esc(localFile.name)}</b><small>${esc(t("ملف من جهازك"))}${localFile.size ? " · " + fmtSize(localFile.size) : ""}</small></div><button type="button" class="icon-btn sm unfile" aria-label="${esc(t("إزالة الملف"))}">${icon("x")}</button>`;
+    box.querySelector(".unfile").onclick = () => setLocalFile(null);
+  } else if (box.classList.contains("file")) { box.hidden = true; box.className = "preview"; }
+  syncFileMode();
+}
+function syncFileMode() {
+  const webm = document.querySelector("input[name=kind][value=webm]");
+  webm.disabled = !!localFile;
+  if (localFile && webm.checked) document.querySelector("input[name=kind][value=mp4]").checked = true;
+  syncKind();
+  $("submit").querySelector("span").textContent = t(localFile ? "تحويل" : "تنزيل");
+}
+function pickWebFile() {
+  const input = $("mediaFile");
+  input.value = "";
+  input.onchange = () => { const f = input.files[0]; if (f) setLocalFile({ webFile: f, name: f.name, size: f.size }); };
+  input.click();
+}
+$("fileBtn").addEventListener("click", async () => {
+  try {
+    if (isWeb()) return pickWebFile();
+    const r = await rpc("pickMedia");
+    if (r && (r.path || r.id)) setLocalFile(r);
+  } catch (e) { toast(e.message, true); }
+});
+async function convertLocal() {
+  savePrefs();
+  if (isAudio(prefs.kind) && prefs.cover === "custom" && !prefs.coverImage) { toast("اختر صورة الغلاف أولًا.", true); setExtras(true); return; }
+  $("submit").disabled = true;
+  try {
+    let file = localFile;
+    if (file.webFile) {
+      // Phone browser (LAN mode): send the file to the computer, which converts it.
+      toast("جارٍ رفع الملف…");
+      const r = await fetch("/upload-media", { method: "POST", headers: { "x-name": encodeURIComponent(file.name) }, body: file.webFile });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "فشل الطلب");
+      file = { path: j.path, name: j.name, size: j.size };
+    }
+    await rpc("convert", {
+      file: file.path || "", fileId: file.id || "", name: file.name, kind: prefs.kind, abr: prefs.abr,
+      from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value), meta: prefs.meta,
+      cover: prefs.cover, coverAt: parseTime(prefs.coverAt), coverImage: prefs.coverImage,
+    });
+    toast("أُضيف إلى قائمة التحويل ✓");
+    selectTab("queue");
+    if (innerWidth <= 980) $("tabQueue").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("trimFrom").value = ""; $("trimTo").value = "";
+    setLocalFile(null);
+    renderSummary();
+    pollJobs();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    $("submit").disabled = false;
+  }
+}
+// Files shared to the app (Android "Share → Nazzil" with a video/audio file).
+window.nazzilSetFile = f => { if (f && (f.id || f.path)) { setLocalFile(f); toast("تم استلام الملف. اختر الصيغة ثم «تحويل»."); } };
+
+// Your own YouTube videos: Google's official export (Takeout), then convert here.
+$("takeoutBtn").addEventListener("click", () => $("takeout").showModal());
+$("openTakeout").addEventListener("click", () => {
+  const url = "https://takeout.google.com/";
+  if (android) location.href = url; else window.open(url, "_blank", "noopener");
+});
+
 /* ---------- Store edition (Google Play: "Nazzil Open") ---------- */
 const STORE_ONLY = "هذه النسخة تنزّل من المصادر المفتوحة فقط: Internet Archive وWikimedia Commons وPeerTube والبودكاست والروابط المباشرة.";
 const isStore = () => !!status.store;
@@ -591,6 +684,7 @@ const platformText = () => status.platform === "android" ? "يعمل محليً�
 function applyLang() {
   NzI18n.translatePage();
   $("langBtn").textContent = NzI18n.lang === "en" ? "ع" : "EN";
+  $("submit").querySelector("span").textContent = t(localFile ? "تحويل" : "تنزيل");
   if (isStore()) $("brandName").textContent = t("نزّل مفتوح");
   if (status.platform && status.yt_dlp && status.ffmpeg) $("tools").textContent = t(platformText());
   renderSummary();

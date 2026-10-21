@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نزّل — تنزيل فيديو وصوت</title>
+<meta name="description" content="نزّل: تنزيل الفيديو والصوت وتحويل الملفات على Windows وAndroid. بلا إعلانات ولا حسابات.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0b0d11">
+<style>
+:root{--bg:#0b0d11;--card:#14171d;--line:#272c35;--text:#f4f6f1;--muted:#9aa2ad;--accent:#c4f55e;--accent2:#9fe03f;--ink:#10170b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1000px 500px at 85% -10%,#2a3d1a66,transparent 60%),var(--bg);color:var(--text);font:16px/1.6 "Segoe UI","Noto Sans Arabic",Tahoma,system-ui,sans-serif}
+main{max-width:1080px;margin:auto;padding:28px 18px 60px}
+header{display:flex;align-items:center;gap:12px}
+header img{width:44px;height:44px;border-radius:12px}
+header b{font-size:22px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;padding:48px 0 30px}
+h1{font-size:clamp(34px,5vw,56px);line-height:1.1;margin:0 0 14px;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--accent)}
+.lead{color:var(--muted);font-size:18px;margin:0}
+.hero img{width:100%;height:auto;border-radius:18px;border:1px solid var(--line);box-shadow:0 20px 60px #0007}
+h2{font-size:24px;margin:40px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px}
+.card h3{margin:0 0 6px;font-size:19px}
+.card p{margin:0 0 14px;color:var(--muted);font-size:14.5px}
+.tag{display:inline-block;font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;background:#c4f55e1a;color:var(--accent);margin-bottom:8px}
+.btns{display:grid;gap:8px}
+a.btn{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;text-decoration:none;font-weight:800;color:var(--ink);background:linear-gradient(180deg,var(--accent),var(--accent2))}
+a.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+a.btn small{font-weight:600;opacity:.7}
+ul.f{margin:0;padding-inline-start:20px;color:var(--muted)}
+ul.f li{margin:4px 0}
+footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:16px}
+footer a{color:var(--accent)}
+@media(max-width:760px){.hero{grid-template-columns:1fr;padding-top:28px}}
+</style>
+</head>
+<body>
+<main>
+  <header><img src="icon.svg" alt=""><b>نزّل</b></header>
+
+  <section class="hero">
+    <div>
+      <h1>من الرابط إلى ملف جاهز<br><em>بلمسة واحدة.</em></h1>
+      <p class="lead">تنزيل الفيديو والصوت وتحويل الملفات على Windows وAndroid. بلا إعلانات ولا حسابات ولا تتبّع، وكل شيء على جهازك.</p>
+    </div>
+    <img src="screen-desktop.png" alt="لقطة من نزّل على Windows" width="1920" height="1080" loading="lazy">
+  </section>
+
+  <h2>التحميل</h2>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">النسخة الكاملة</span>
+      <h3>Windows</h3>
+      <p>YouTube وأكثر من 1000 موقع، وتحويل الملفات، والاستخدام من متصفح الجوال عبر الكمبيوتر.</p>
+      <div class="btns">
+        <a class="btn" href="https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-Setup.exe">تنزيل للمثبّت <small>.exe</small></a>
+        <a class="btn ghost" href="https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-Portable.exe">نسخة بلا تثبيت <small>.exe</small></a>
+      </div>
+    </div>
+    <div class="card">
+      <span class="tag">النسخة الكاملة</span>
+      <h3>Android</h3>
+      <p>YouTube وأكثر من 1000 موقع، والتنزيل في الخلفية، ومشاركة الروابط والملفات إلى نزّل.</p>
+      <div class="btns">
+        <a class="btn" href="https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-arm64-v8a.apk">أغلب الهواتف <small>APK</small></a>
+        <a class="btn ghost" href="https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-universal.apk">أي جهاز <small>APK</small></a>
+      </div>
+    </div>
+    <div class="card">
+      <span class="tag">Google Play</span>
+      <h3>نزّل مفتوح</h3>
+      <p>للمحتوى الحر والملكية العامة: Internet Archive وWikimedia Commons وPeerTube والبودكاست، إضافةً إلى تحويل ملفاتك.</p>
+      <div class="btns">
+        <a class="btn ghost" href="https://play.google.com/store/apps/details?id=app.nazzil.open">على Google Play <small>قريبًا</small></a>
+      </div>
+    </div>
+  </div>
+
+  <h2>المزايا</h2>
+  <div class="grid">
+    <div class="card"><h3>تنزيل سهل</h3><ul class="f"><li>الصق الرابط أو اسحبه أو شاركه</li><li>MP3 وM4A وMP4 وWEBM حتى 4K</li><li>معاينة قبل التنزيل</li></ul></div>
+    <div class="card"><h3>قائمة ذكية</h3><ul class="f"><li>تنزيلات متزامنة</li><li>إيقاف واستئناف وإعادة محاولة</li><li>تستمر في الخلفية</li></ul></div>
+    <div class="card"><h3>الإضافات</h3><ul class="f"><li>قص مقطع وقوائم تشغيل</li><li>صورة غلاف: لقطة أو صورتك</li><li>البيانات والترجمة</li></ul></div>
+    <div class="card"><h3>ملفاتك</h3><ul class="f"><li>حوّل أي فيديو أو صوت على جهازك</li><li>فيديوهاتك من YouTube عبر Google Takeout</li><li>عربي وإنجليزي، داكن وفاتح</li></ul></div>
+  </div>
+
+  <footer>
+    <span>نزّل مفتوح المصدر — GPL-3.0</span>
+    <a href="https://github.com/abdulrahmanahmedelabed-prog/nazzil">الكود المصدري</a>
+    <a href="https://github.com/abdulrahmanahmedelabed-prog/nazzil/blob/main/PRIVACY.md">سياسة الخصوصية</a>
+    <span>نزّل فقط ما تملكه أو لديك إذن بتنزيله.</span>
+  </footer>
+</main>
+</body>
+</html>

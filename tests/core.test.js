@@ -159,3 +159,28 @@ test("store edition: its platforms are all allowed and none of the full edition'
   for (const s of STORE_SITES) assert.ok(y.storeAllows(s.url), s.id);
   for (const s of SITES) assert.ok(!y.storeAllows(s.url), s.id + " must not be reachable in the store edition");
 });
+
+test("converting a local file: formats, trim, metadata, fast copy", () => {
+  const mp3 = y.convertArgs({ kind: "mp3", abr: "192", from: "0:10", to: "0:40", title: "My clip" }, "/in.mov", "/out.mp3");
+  assert.deepEqual(mp3.slice(mp3.indexOf("-ss"), mp3.indexOf("-ss") + 4), ["-ss", "10", "-i", "/in.mov"]);
+  assert.equal(mp3[mp3.indexOf("-t") + 1], "30");
+  assert.ok(mp3.includes("libmp3lame") && mp3.includes("-vn") && mp3.includes("title=My clip"));
+  assert.equal(mp3.at(-1), "/out.mp3");
+  const copy = y.convertArgs({ kind: "mp4" }, "/in.mkv", "/o.mp4", true);
+  assert.ok(copy.includes("copy") && !copy.includes("libx264"));
+  const enc = y.convertArgs({ kind: "mp4", from: "5" }, "/in.mkv", "/o.mp4");
+  assert.ok(enc.includes("libx264") && enc.includes("+faststart"));
+  const weird = y.convertArgs({ kind: "--exec", abr: "x", from: "1;rm", to: "bad" }, "/i", "/o");
+  assert.ok(weird.includes("libmp3lame") && !weird.includes("-ss") && !weird.includes("-t"));
+  assert.ok(y.convertArgs({ kind: "m4a", meta: false }, "/i", "/o").includes("-1"), "metadata can be stripped");
+  assert.equal(y.ffDuration("  Duration: 01:02:03.50, start: 0.000"), 3723.5);
+  assert.equal(y.ffTime("out_time_us=2500000"), 2.5);
+  assert.equal(y.ffTime("progress=continue"), -1);
+  assert.equal(y.baseTitle("Holiday (2024).final.mov"), "Holiday (2024).final");
+  assert.deepEqual(y.frameArgs("/v.mp4", 12, "/c.jpg").slice(3, 7), ["-ss", "12", "-i", "/v.mp4"]);
+});
+
+test("the English dictionary has no duplicate keys (a duplicate silently overrides the first)", () => {
+  const keys = [...read("web/i18n.js").matchAll(/^\s*"([^"]+)":/gm)].map(m => m[1]);
+  assert.deepEqual(keys.filter((k, i) => keys.indexOf(k) !== i), []);
+});
