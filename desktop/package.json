@@ -1,11 +1,12 @@
 {
   "name": "nazzil",
   "productName": "Nazzil",
-  "version": "4.4.0",
-  "description": "نزّل — استوديو الفيديو والصوت",
+  "version": "4.5.0",
+  "description": "Nazzil — video & audio downloader",
   "main": "main.js",
-  "author": "Nazzil",
-  "license": "MIT",
+  "author": "Abdulrahman Ahmed",
+  "homepage": "https://github.com/abdulrahmanahmedelabed-prog/nazzil",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "electron .",
     "fetch-bin": "node fetch-bin.js",
@@ -15,16 +16,56 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "app.nazzil.desktop",
     "productName": "Nazzil",
-    "files": ["main.js", "server.js", "browse-preload.js", "web/**"],
-    "extraResources": [{ "from": "bin", "to": "bin" }],
-    "win": { "target": ["nsis", "portable"] },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Nazzil-Setup.${ext}" },
-    "portable": { "artifactName": "Nazzil-Portable.${ext}" }
+    "copyright": "Copyright © 2026 Abdulrahman Ahmed — GPL-3.0",
+    "files": [
+      "main.js",
+      "server.js",
+      "browse-preload.js",
+      "web/**",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin"
+      },
+      {
+        "from": "legal",
+        "to": "legal"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Nazzil-Setup.${ext}",
+      "license": "legal/LICENSE.txt",
+      "shortcutName": "Nazzil"
+    },
+    "portable": {
+      "artifactName": "Nazzil-Portable.${ext}"
+    },
+    "appx": {
+      "displayName": "Nazzil",
+      "applicationId": "Nazzil",
+      "backgroundColor": "#0b0d11",
+      "languages": [
+        "ar",
+        "en-US"
+      ],
+      "artifactName": "Nazzil-Store.${ext}"
+    }
   }
 }

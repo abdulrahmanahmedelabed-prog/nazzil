@@ -5,13 +5,13 @@ plugins {
 
 android {
     namespace = "app.nazzil"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "app.nazzil"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 9
-        versionName = "4.4.0"
+        targetSdk = 36
+        versionCode = 10
+        versionName = "4.5.0"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     splits {
@@ -22,11 +22,21 @@ android {
             isUniversalApk = true
         }
     }
+    // Release signing comes from the environment (CI secrets). Without it the build falls back to the debug key,
+    // which installs fine from GitHub but is NOT accepted by Google Play.
+    val ks = System.getenv("NAZZIL_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (ks != null) create("release") {
+            storeFile = ks
+            storePassword = System.getenv("NAZZIL_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("NAZZIL_KEY_ALIAS")
+            keyPassword = System.getenv("NAZZIL_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key so the APK installs directly; replace with your own keystore for Play Store.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (ks != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -40,8 +50,9 @@ android {
 }
 
 dependencies {
-    implementation("io.github.junkfood02.youtubedl-android:library:0.17.4")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.4")
+    // 0.18.x: native libs aligned to 16 KB pages (required by Google Play) and bundled QuickJS for YouTube.
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
 }

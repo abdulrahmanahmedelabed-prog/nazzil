@@ -16,7 +16,10 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import java.util.Locale
 
 /**
@@ -30,6 +33,7 @@ class BrowseActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val start = intent.getStringExtra(EXTRA_URL)?.takeIf { it.startsWith("https://") } ?: "https://m.youtube.com/"
         isMedia = runCatching { Regex(intent.getStringExtra(EXTRA_MATCH)!!.ifEmpty { "(?!)" }, RegexOption.IGNORE_CASE) }.getOrElse { Regex("(?!)") }
@@ -77,6 +81,13 @@ class BrowseActivity : AppCompatActivity() {
         val root = FrameLayout(this)
         root.addView(web, FrameLayout.LayoutParams(-1, -1))
         root.addView(pick, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = 64 })
+        root.setBackgroundColor(Color.parseColor("#0f0f0f"))
+        // Edge-to-edge (Android 15+): keep the site and the button clear of the system bars.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
+            v.setPadding(b.left, b.top, b.right, b.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
         setContentView(root)
         web.loadUrl(start)
 

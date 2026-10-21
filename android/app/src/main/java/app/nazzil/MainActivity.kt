@@ -16,12 +16,18 @@ import android.provider.OpenableColumns
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import android.widget.FrameLayout
 import androidx.webkit.WebViewAssetLoader
 import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
+    private lateinit var root: FrameLayout
     private var pendingUrl: String? = null
     private var loaded = false
     @Volatile private var imageResult: CompletableFuture<Uri?>? = null
@@ -48,12 +54,13 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val assets = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
         web = WebView(this).apply {
-            setBackgroundColor(0xFF15161A.toInt())
+            setBackgroundColor(0xFF0B0D11.toInt())
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             addJavascriptInterface(Bridge(this@MainActivity), "NazzilAndroid")
@@ -69,11 +76,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        setContentView(web)
+        // Android 15+ draws edge-to-edge: pad the page so it never sits under the status/navigation bars or keyboard.
+        root = FrameLayout(this).apply { setBackgroundColor(0xFF0B0D11.toInt()); addView(web) }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
+            v.setPadding(b.left, b.top, b.right, b.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        setContentView(root)
         web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() { if (web.canGoBack()) web.goBack() else finish() }
+            // Let the page close its drawer/dialog first; leave the app only when there's nothing to close.
+            override fun handleOnBackPressed() {
+                web.evaluateJavascript("window.nazzilBack ? window.nazzilBack() : false") { handled -> if (handled != "true") finish() }
+            }
         })
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -97,6 +114,17 @@ class MainActivity : AppCompatActivity() {
     fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             runOnUiThread { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2) }
+        }
+    }
+
+    /** Matches the system bars to the page's light/dark theme. */
+    fun applyTheme(light: Boolean) = runOnUiThread {
+        val bg = if (light) 0xFFF3F5F0.toInt() else 0xFF0B0D11.toInt()
+        root.setBackgroundColor(bg)
+        web.setBackgroundColor(bg)
+        WindowCompat.getInsetsController(window, root).apply {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
         }
     }
 

@@ -21,7 +21,7 @@
     } catch { return null; }
   }
 
-  /** opts: {url, kind, quality, abr, playlist, meta, subs, sponsor, from, to, rate, cookies}; env: {outDir, ffmpeg?, tempDir?, cookiesFile?} */
+  /** opts: {url, kind, quality, abr, playlist, meta, subs, sponsor, from, to, rate, cookies}; env: {outDir, ffmpeg?, tempDir?, cookiesFile?, jsRuntime?} */
   function buildArgs(opts, env) {
     const kind = ["mp3", "m4a", "mp4", "webm"].includes(opts.kind) ? opts.kind : "mp3";
     const q = HEIGHTS.includes(String(opts.quality)) ? String(opts.quality) : "1080";
@@ -33,6 +33,7 @@
       "--retries", "10", "--fragment-retries", "10", "--concurrent-fragments", "4",
       "-P", env.outDir];
     if (env.ffmpeg) a.push("--ffmpeg-location", env.ffmpeg);
+    if (env.jsRuntime) a.push("--js-runtimes", env.jsRuntime); // e.g. "deno:C:\\…\\deno.exe" (YouTube needs a JS runtime)
     // Per-job temp dir so parallel jobs for the same video don't clobber each other's intermediates.
     if (env.tempDir) a.push("-P", "temp:" + env.tempDir);
 

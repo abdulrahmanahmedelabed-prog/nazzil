@@ -2,139 +2,187 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d11">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 <title>نزّل — فيديو وصوت</title>
 </head>
 <body>
-<div class="shell">
+<!-- Icon set (stroke icons, 24×24) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-paste" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 4v16M16 4v16"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+    <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></symbol>
+    <symbol id="i-cc" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M10 10.5a2 2 0 1 0 0 3M17 10.5a2 2 0 1 0 0 3"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M12 3v10M8 9l4 4 4-4"/><path d="M4 17h16M4 21h16"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  </defs>
+</svg>
+
+<div class="app" id="app">
   <header class="topbar">
-    <div class="brand"><div class="mark">↓</div><div><strong>نزّل</strong><span>استوديو الفيديو والصوت</span></div></div>
+    <div class="brand">
+      <img src="icon.svg" alt="" width="34" height="34">
+      <div><strong>نزّل</strong><span id="tools" class="tools">فحص الأدوات…</span></div>
+    </div>
     <div class="top-actions">
-      <span class="live"><i></i> محلي وآمن</span>
       <button id="langBtn" class="icon-btn lang-btn" aria-label="اللغة" title="اللغة" data-no-i18n>EN</button>
-      <button id="settingsBtn" class="icon-btn" aria-label="الإعدادات" title="الإعدادات">⚙</button>
-      <button id="themeBtn" class="icon-btn" aria-label="تبديل المظهر" title="المظهر">☼</button>
+      <button id="themeBtn" class="icon-btn" aria-label="تبديل المظهر" title="المظهر"><svg><use href="#i-sun"/></svg></button>
+      <button id="settingsBtn" class="icon-btn" aria-label="الإعدادات" title="الإعدادات"><svg><use href="#i-gear"/></svg></button>
     </div>
   </header>
 
   <a id="updateBar" class="update-bar" hidden target="_blank" rel="noopener"></a>
 
-  <section class="welcome">
-    <div>
-      <p class="tag">مساحة التحويل الخاصة بك</p>
-      <h1>من الرابط إلى ملف جاهز<br><em>بلمسة واحدة.</em></h1>
-      <p class="sub">YouTube وأكثر من 1000 موقع · قوائم تشغيل · حتى 4K · بلا إعلانات. ملفاتك تبقى على جهازك.</p>
-    </div>
-    <div class="orbit"><span>MP3</span><span>4K</span><span>OFFLINE</span></div>
-  </section>
+  <div class="content">
+    <main class="main">
+      <!-- 1) What to download -->
+      <form id="form" class="card composer" novalidate>
+        <div class="url-row">
+          <label class="url-box" for="url">
+            <svg class="lead"><use href="#i-link"/></svg>
+            <input id="url" type="text" inputmode="url" placeholder="الصق رابط فيديو أو قائمة تشغيل…" autocomplete="off" spellcheck="false" aria-label="رابط الفيديو أو قائمة التشغيل">
+            <button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط" hidden><svg><use href="#i-x"/></svg></button>
+          </label>
+          <button type="button" id="pasteBtn" class="btn ghost paste-btn"><svg><use href="#i-paste"/></svg><span>لصق</span></button>
+        </div>
 
-  <div class="workspace">
-    <section class="panel download-panel">
-      <div class="panel-head"><div><span class="step">01</span><h2>أضف الرابط</h2></div><span id="tools" class="tools">فحص الأدوات…</span></div>
-      <form id="form" novalidate>
-        <label class="url-label">رابط الفيديو أو قائمة التشغيل
-          <input id="url" type="text" inputmode="url" required placeholder="https://youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
-          <button type="button" id="clearUrl" class="clear" aria-label="مسح الرابط">×</button>
-        </label>
-        <button type="button" id="browseBtn" class="browse-btn"><span class="yt">▶</span><span>تصفّح YouTube و Facebook و TikTok… واختر الفيديو</span></button>
-        <div id="dropzone" class="dropzone" role="button" tabindex="0"><span>اسحب الرابط هنا أو اضغط للصق من الحافظة</span><small>YouTube · TikTok · Instagram · X · Facebook · SoundCloud · Vimeo وغيرها</small><small>يمكنك لصق عدة روابط دفعة واحدة</small></div>
+        <div class="sites-row">
+          <span class="sites-label">أو تصفّح:</span>
+          <div id="siteGrid" class="sites" data-no-i18n></div>
+        </div>
 
         <div id="preview" class="preview" hidden></div>
 
-        <div class="panel-head format-title"><div><span class="step">02</span><h2>الصيغة والجودة</h2></div></div>
-        <div class="formats">
-          <label><input type="radio" name="kind" value="mp3" checked><span class="format-card"><b><i>♫</i> MP3</b><small>صوت متوافق مع كل الأجهزة</small><mark>الأكثر طلبًا</mark></span></label>
-          <label><input type="radio" name="kind" value="m4a"><span class="format-card"><b><i>♪</i> M4A</b><small>صوت أصلي بلا إعادة ترميز</small></span></label>
-          <label><input type="radio" name="kind" value="mp4"><span class="format-card"><b><i>▶</i> MP4</b><small>فيديو يعمل في كل مكان</small></span></label>
-          <label><input type="radio" name="kind" value="webm"><span class="format-card"><b><i>◆</i> WEBM</b><small>أعلى جودة · حتى 8K</small></span></label>
-        </div>
-        <div class="row">
-          <label class="field" id="videoQ">دقة الفيديو
-            <select id="quality">
-              <option value="best">أفضل متاح</option><option value="2160">4K ‏(2160p)</option><option value="1440">1440p</option>
+        <div class="format-row">
+          <div class="formats" role="radiogroup" aria-label="الصيغة">
+            <label><input type="radio" name="kind" value="mp3" checked><span><b>MP3</b><small>صوت</small></span></label>
+            <label><input type="radio" name="kind" value="m4a"><span><b>M4A</b><small>صوت أصلي</small></span></label>
+            <label><input type="radio" name="kind" value="mp4"><span><b>MP4</b><small>فيديو</small></span></label>
+            <label><input type="radio" name="kind" value="webm"><span><b>WEBM</b><small>حتى 8K</small></span></label>
+          </div>
+          <label class="quality" id="videoQ"><span class="sr">دقة الفيديو</span>
+            <select id="quality" aria-label="دقة الفيديو">
+              <option value="best">أفضل متاح</option><option value="2160">4K</option><option value="1440">1440p</option>
               <option value="1080" selected>1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option>
             </select>
           </label>
-          <label class="field" id="audioQ">جودة الصوت
-            <select id="abr"><option value="0">الأعلى (VBR)</option><option value="320">320 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option></select>
+          <label class="quality" id="audioQ"><span class="sr">جودة الصوت</span>
+            <select id="abr" aria-label="جودة الصوت"><option value="0">الأعلى</option><option value="320">320 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option></select>
           </label>
         </div>
 
-        <div class="cover-box" id="coverBox">
-          <span class="field-title">صورة الغلاف</span>
-          <div class="seg" role="radiogroup">
-            <label><input type="radio" name="cover" value="thumb" checked><span>صورة المقطع</span></label>
-            <label><input type="radio" name="cover" value="frame"><span>لقطة من الفيديو</span></label>
-            <label><input type="radio" name="cover" value="custom"><span>صورة من جهازي</span></label>
-            <label><input type="radio" name="cover" value="none"><span>بدون صورة</span></label>
-          </div>
-          <div class="cover-extra" id="coverFrame" hidden>
-            <span>اللقطة عند الثانية</span>
-            <input id="coverAt" placeholder="0:30" inputmode="numeric" dir="ltr">
-            <small>مثال: 1:15 — إن كان المقطع أقصر تُؤخذ من بدايته</small>
-          </div>
-          <div class="cover-extra" id="coverCustom" hidden>
-            <button type="button" id="pickCover" class="ghost">اختر صورة…</button>
-            <span id="coverName" class="cover-name" data-no-i18n></span>
-          </div>
+        <div class="cta-row">
+          <button type="button" id="extrasBtn" class="btn ghost extras-btn" aria-controls="extras" aria-expanded="false"><svg><use href="#i-sliders"/></svg><span>الإضافات</span><em id="extrasCount"></em></button>
+          <button id="submit" class="btn primary download-btn"><svg><use href="#i-dl"/></svg><span>تنزيل</span><kbd>Ctrl ↵</kbd></button>
         </div>
-
-        <details class="advanced" id="advanced">
-          <summary><span class="step">03</span> خيارات متقدمة</summary>
-          <div class="opts">
-            <label class="switch"><input type="checkbox" id="playlist"><span>تنزيل قائمة التشغيل كاملة</span></label>
-            <label class="switch"><input type="checkbox" id="meta" checked><span>تضمين البيانات (العنوان، الفنان، الفصول)</span></label>
-            <label class="switch"><input type="checkbox" id="subs"><span>تضمين الترجمة (عربي / إنجليزي)</span></label>
-            <label class="switch"><input type="checkbox" id="sponsor"><span>حذف الإعلانات المدمجة والمقدمات (SponsorBlock)</span></label>
-            <div class="trim">
-              <span>قص مقطع</span>
-              <input id="trimFrom" placeholder="من 0:00" inputmode="numeric" dir="ltr">
-              <input id="trimTo" placeholder="إلى 1:30" inputmode="numeric" dir="ltr">
-            </div>
-          </div>
-        </details>
-
-        <button id="submit" class="download-btn"><span>إضافة إلى التنزيلات</span><b>Ctrl ↵</b></button>
+        <div id="summary" class="summary" aria-live="polite"></div>
       </form>
-      <div id="message" class="message" hidden></div>
-    </section>
 
-    <aside class="side">
-      <section class="side-card">
-        <div class="side-title"><h3>قائمة التنزيل <em id="queueCount"></em></h3></div>
-        <div id="queue" class="queue"><div class="history-empty">لا توجد تنزيلات جارية</div></div>
+      <!-- 2) Downloads and history -->
+      <section class="card downloads">
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tabQueue" class="tab" aria-selected="true" aria-controls="queue"><svg><use href="#i-queue"/></svg><span>التنزيلات</span><em id="queueCount"></em></button>
+          <button role="tab" id="tabHistory" class="tab" aria-selected="false" aria-controls="historyPane"><svg><use href="#i-history"/></svg><span>السجل</span></button>
+          <span class="tabs-spacer"></span>
+          <button type="button" id="openFolderTop" class="icon-btn sm" title="فتح مجلد التنزيلات" aria-label="فتح مجلد التنزيلات"><svg><use href="#i-folder"/></svg></button>
+        </div>
+        <div id="queue" class="list" role="tabpanel"></div>
+        <div id="historyPane" class="list" role="tabpanel" hidden>
+          <div class="history-tools">
+            <label class="search"><svg><use href="#i-search"/></svg><input id="historySearch" type="search" placeholder="ابحث في التنزيلات…"></label>
+            <button type="button" id="clearHistory" class="text-btn">مسح الكل</button>
+          </div>
+          <div id="history"></div>
+        </div>
       </section>
-      <section class="side-card">
-        <div class="side-title"><h3>نشاطك الأخير</h3><button id="clearHistory" class="text-btn">مسح الكل</button></div>
+    </main>
+
+    <!-- 3) Add-ons (side panel; a drawer on small screens) -->
+    <aside class="card extras" id="extras" aria-label="الإضافات">
+      <div class="extras-head">
+        <h2><svg><use href="#i-sliders"/></svg>الإضافات</h2>
+        <button type="button" id="extrasReset" class="text-btn">إعادة الضبط</button>
+        <button type="button" id="extrasClose" class="icon-btn sm extras-close" aria-label="إغلاق"><svg><use href="#i-x"/></svg></button>
+      </div>
+
+      <section class="x-sec" id="coverBox">
+        <h3><svg><use href="#i-image"/></svg>صورة الغلاف <small>للصوت</small></h3>
+        <div class="seg" role="radiogroup" aria-label="صورة الغلاف">
+          <label><input type="radio" name="cover" value="thumb" checked><span>صورة المقطع</span></label>
+          <label><input type="radio" name="cover" value="frame"><span>لقطة من الفيديو</span></label>
+          <label><input type="radio" name="cover" value="custom"><span>صورة من جهازي</span></label>
+          <label><input type="radio" name="cover" value="none"><span>بدون صورة</span></label>
+        </div>
+        <div class="x-extra" id="coverFrame" hidden>
+          <label>اللقطة عند <input id="coverAt" placeholder="0:30" inputmode="numeric" dir="ltr"></label>
+          <small>مثال: 1:15 — إن كان المقطع أقصر تُؤخذ من بدايته</small>
+        </div>
+        <div class="x-extra" id="coverCustom" hidden>
+          <button type="button" id="pickCover" class="btn ghost sm">اختر صورة…</button>
+          <span id="coverName" class="cover-name" data-no-i18n></span>
+        </div>
         <input type="file" id="coverFile" accept="image/*" hidden>
-        <input id="historySearch" class="search" type="search" placeholder="ابحث في التنزيلات…" hidden>
-        <div id="history" class="history"></div>
       </section>
-      <section class="side-card privacy"><div class="privacy-icon">✓</div><div><h3>خصوصيتك أولاً</h3><p>المعالجة تتم على جهازك. لا حسابات، لا تتبع، لا إعلانات.</p></div></section>
+
+      <section class="x-sec">
+        <h3><svg><use href="#i-scissors"/></svg>قص مقطع</h3>
+        <div class="trim">
+          <input id="trimFrom" placeholder="من 0:00" inputmode="numeric" dir="ltr" aria-label="من">
+          <span>—</span>
+          <input id="trimTo" placeholder="إلى 1:30" inputmode="numeric" dir="ltr" aria-label="إلى">
+        </div>
+      </section>
+
+      <section class="x-sec">
+        <h3><svg><use href="#i-check"/></svg>خيارات</h3>
+        <label class="switch"><span><svg><use href="#i-layers"/></svg>تنزيل قائمة التشغيل كاملة</span><input type="checkbox" id="playlist" role="switch"></label>
+        <label class="switch"><span><svg><use href="#i-tag"/></svg>تضمين البيانات (العنوان، الفنان، الفصول)</span><input type="checkbox" id="meta" role="switch" checked></label>
+        <label class="switch" id="subsRow"><span><svg><use href="#i-cc"/></svg>تضمين الترجمة (عربي / إنجليزي)</span><input type="checkbox" id="subs" role="switch"></label>
+        <label class="switch"><span><svg><use href="#i-zap"/></svg>حذف الإعلانات المدمجة والمقدمات (SponsorBlock)</span><input type="checkbox" id="sponsor" role="switch"></label>
+      </section>
+
+      <p class="x-note">تُطبَّق الإضافات على التنزيل التالي وتُحفظ لمرّات قادمة.</p>
     </aside>
   </div>
 
-  <dialog id="sites" class="settings sites-dlg">
-    <form method="dialog">
-      <h3>اختر المنصة</h3>
-      <p class="hint">افتح المنصة، ثم اضغط «⬇ تنزيل بـ نزّل» على أي فيديو.</p>
-      <div id="siteGrid" class="site-grid" data-no-i18n></div>
-      <button class="ghost close-sites" value="close">إغلاق</button>
-    </form>
-  </dialog>
+  <div class="scrim" id="scrim" hidden></div>
+  <div class="drop-overlay" id="dropOverlay" hidden><div><svg><use href="#i-dl"/></svg><b>أفلت الرابط هنا</b></div></div>
+  <div class="toasts" id="toasts" aria-live="assertive"></div>
 
-  <dialog id="settings" class="settings">
+  <dialog id="settings" class="dialog">
     <form method="dialog">
-      <h3>الإعدادات</h3>
-      <div class="set-row" id="folderRow"><div><b>مجلد الحفظ</b><small id="folderPath">—</small></div><button type="button" id="pickFolder" class="ghost">تغيير</button><button type="button" id="openFolder" class="ghost">فتح</button></div>
+      <div class="dlg-head"><h3>الإعدادات</h3><button class="icon-btn sm" value="close" aria-label="إغلاق"><svg><use href="#i-x"/></svg></button></div>
+      <div class="set-row" id="folderRow"><div><b>مجلد الحفظ</b><small id="folderPath">—</small></div><button type="button" id="pickFolder" class="btn ghost sm">تغيير</button><button type="button" id="openFolder" class="btn ghost sm">فتح</button></div>
       <div class="set-row"><div><b>التنزيلات المتزامنة</b><small>عدد الملفات التي تُنزّل في نفس الوقت</small></div><select id="parallel"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
       <div class="set-row"><div><b>حد السرعة</b><small>لترك الإنترنت متاحًا لبقية الأجهزة</small></div><select id="rate"><option value="">بلا حد</option><option value="500K">500 KB/s</option><option value="1M">1 MB/s</option><option value="2M">2 MB/s</option><option value="5M">5 MB/s</option><option value="10M">10 MB/s</option></select></div>
       <div class="set-row" id="cookiesRow"><div><b>ملفات تعريف الارتباط</b><small>للمقاطع المقيّدة بالعمر أو الخاصة بالأعضاء</small></div><select id="cookies"><option value="">بدون</option><option value="chrome">Chrome</option><option value="edge">Edge</option><option value="firefox">Firefox</option><option value="brave">Brave</option><option value="opera">Opera</option></select></div>
-      <div class="set-row" id="loginRow"><div><b>استخدام تسجيل دخولي</b><small>حساباتك في متصفح نزّل (Instagram، Facebook…) للمحتوى الذي يتطلب الدخول</small></div><input type="checkbox" id="useLogin" checked></div>
-      <div class="set-row" id="clipRow"><div><b>لصق تلقائي</b><small>التقاط الرابط من الحافظة عند فتح التطبيق</small></div><input type="checkbox" id="autoClip" checked></div>
-      <div class="set-row" id="lanRow" hidden><div><b>الوصول من الجوال</b><small>استخدم نزّل من متصفح أي جهاز على نفس شبكة الواي فاي</small></div><input type="checkbox" id="lanToggle"></div>
+      <label class="set-row" id="loginRow"><div><b>استخدام تسجيل دخولي</b><small>حساباتك في متصفح نزّل (Instagram، Facebook…) للمحتوى الذي يتطلب الدخول</small></div><input type="checkbox" id="useLogin" role="switch" checked></label>
+      <label class="set-row" id="clipRow"><div><b>لصق تلقائي</b><small>التقاط الرابط من الحافظة عند فتح التطبيق</small></div><input type="checkbox" id="autoClip" role="switch" checked></label>
+      <label class="set-row" id="lanRow" hidden><div><b>الوصول من الجوال</b><small>استخدم نزّل من متصفح أي جهاز على نفس شبكة الواي فاي</small></div><input type="checkbox" id="lanToggle" role="switch"></label>
       <div class="lan-panel" id="lanPanel" hidden>
         <img id="lanQr" alt="QR">
         <div>
@@ -142,15 +190,21 @@
           <small>أو افتح هذا الرابط في متصفح الجوال:</small>
           <code id="lanUrl" data-no-i18n></code>
           <small>يجب أن يكون الجوال على نفس شبكة الواي فاي، وأن يبقى نزّل مفتوحًا على الكمبيوتر. إذا سألك Windows عن جدار الحماية فاختر «السماح».</small>
-          <button type="button" id="lanReset" class="ghost">إنشاء رابط جديد (يلغي القديم)</button>
+          <button type="button" id="lanReset" class="btn ghost sm">إنشاء رابط جديد (يلغي القديم)</button>
         </div>
       </div>
-      <div class="set-row" id="engineRow"><div><b>محرك التنزيل</b><small id="engineVer">yt-dlp</small></div><button type="button" id="updateBtn" class="ghost">تحديث</button></div>
-      <button class="download-btn" value="close">تم</button>
+      <div class="set-row" id="engineRow"><div><b>محرك التنزيل</b><small id="engineVer">yt-dlp</small></div><button type="button" id="updateBtn" class="btn ghost sm">تحديث</button></div>
+      <div class="about">
+        <img src="icon.svg" alt="" width="40" height="40">
+        <div>
+          <b>نزّل <span id="appVersion" data-no-i18n></span></b>
+          <small>بلا حسابات ولا إعلانات ولا تتبع. كل المعالجة تتم على جهازك.</small>
+          <small>نزّل فقط ما تملكه أو لديك إذن بتنزيله، والتزم بشروط كل منصة.</small>
+          <small>يستخدم برمجيات مفتوحة المصدر: yt-dlp، FFmpeg (GPL)، youtubedl-android (GPL-3.0)، Deno. نزّل مرخّص بـ GPL-3.0.</small>
+        </div>
+      </div>
     </form>
   </dialog>
-
-  <footer><span>نزّل <span data-no-i18n>4.4</span></span><span id="platform">يعمل محليًا على جهازك</span><span>للمحتوى المصرّح به فقط</span></footer>
 </div>
 <script src="i18n.js"></script>
 <script src="sites.js"></script>

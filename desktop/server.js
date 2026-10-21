@@ -40,6 +40,10 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   } catch {}
   if (!fs.existsSync(ytdlp)) ytdlp = "yt-dlp";
   const ffmpeg = fs.existsSync(path.join(binDir, "ffmpeg" + EXE)) ? path.join(binDir, "ffmpeg" + EXE) : "ffmpeg";
+  // Bundled Deno: yt-dlp needs a JavaScript runtime for YouTube and only looks for Deno on PATH by default.
+  const deno = path.join(binDir, "deno" + EXE);
+  const jsRuntime = fs.existsSync(deno) ? "deno:" + deno : "";
+  const jsArgs = jsRuntime ? ["--js-runtimes", jsRuntime] : [];
 
   const jobs = new Map();
   const queueFile = path.join(dataDir, "queue.json");
@@ -91,7 +95,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   function start(job) {
     job.state = "working";
     const tempDir = path.join(dataDir, "tmp", job.id);
-    const args = buildArgs(job.opts, { outDir: settings.folder, ffmpeg, tempDir, cookiesFile: cookies() });
+    const args = buildArgs(job.opts, { outDir: settings.folder, ffmpeg, tempDir, cookiesFile: cookies(), jsRuntime });
     const p = spawn(ytdlp, args, { windowsHide: true });
     job.proc = p;
     let err = "";
@@ -153,7 +157,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
         // Try the chosen second; if the video is shorter than that, fall back to the first second.
         for (const sec of [toSeconds(opts.coverAt) || 30, 1]) {
           for (const f of fs.readdirSync(work)) fs.rmSync(path.join(work, f), { force: true });
-          await run(ytdlp, ["--ffmpeg-location", ffmpeg, ...(cookies() && !opts.cookies && opts.useLogin !== false ? ["--cookies", cookies()] : []), ...coverArgs.clip(pageUrl, sec, path.join(work, "clip.%(ext)s"), opts.cookies)], { timeout: 120000 });
+          await run(ytdlp, ["--ffmpeg-location", ffmpeg, ...jsArgs, ...(cookies() && !opts.cookies && opts.useLogin !== false ? ["--cookies", cookies()] : []), ...coverArgs.clip(pageUrl, sec, path.join(work, "clip.%(ext)s"), opts.cookies)], { timeout: 120000 });
           const clip = fs.readdirSync(work).find(f => f.startsWith("clip."));
           if (clip && (await run(ffmpeg, coverArgs.toJpeg(path.join(work, clip), jpg))).ok && fs.existsSync(jpg)) break;
         }
@@ -190,7 +194,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
       const u = validUrl(url);
       if (!u) throw new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://");
       const login = cookies() ? ["--cookies", cookies()] : [];
-      const r = await run(ytdlp, ["-J", "--flat-playlist", "--no-warnings", "--playlist-end", "500", ...login, "--", u], { timeout: 45000 });
+      const r = await run(ytdlp, ["-J", "--flat-playlist", "--no-warnings", "--playlist-end", "500", ...jsArgs, ...login, "--", u], { timeout: 45000 });
       if (!r.ok) throw new Error(lastError(r.stderr));
       return summarizeInfo(JSON.parse(r.stdout));
     },

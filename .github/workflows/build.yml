@@ -11,24 +11,53 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    defaults: { run: { working-directory: desktop } }
+  test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: Copy-Item -Recurse ../web ./web
+      - run: node --test "tests/*.test.js"
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    defaults: { run: { working-directory: desktop } }
+    env:
+      MSSTORE_IDENTITY_NAME: ${{ secrets.MSSTORE_IDENTITY_NAME }}
+      MSSTORE_PUBLISHER: ${{ secrets.MSSTORE_PUBLISHER }}
+      MSSTORE_PUBLISHER_NAME: ${{ secrets.MSSTORE_PUBLISHER_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Bring in the shared UI and license files
         shell: pwsh
+        run: |
+          Copy-Item -Recurse ../web ./web
+          New-Item -ItemType Directory -Force legal | Out-Null
+          Copy-Item ../LICENSE legal/LICENSE.txt
+          Copy-Item ../THIRD_PARTY_NOTICES.md legal/
       - run: npm install
       - run: npm run fetch-bin
       - run: npm run dist
+      # Microsoft Store package (MSIX). Runs only when the Partner Center identity is configured as secrets.
+      - name: Build MSIX for Microsoft Store
+        if: env.MSSTORE_IDENTITY_NAME != ''
+        shell: pwsh
+        run: npx electron-builder --win appx --publish never "-c.appx.identityName=$env:MSSTORE_IDENTITY_NAME" "-c.appx.publisher=$env:MSSTORE_PUBLISHER" "-c.appx.publisherDisplayName=$env:MSSTORE_PUBLISHER_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: Nazzil-Windows
-          path: desktop/dist/*.exe
+          path: desktop/dist/Nazzil-*.exe
+      - uses: actions/upload-artifact@v4
+        if: env.MSSTORE_IDENTITY_NAME != ''
+        with:
+          name: Nazzil-MicrosoftStore
+          path: desktop/dist/*.appx
 
   android:
+    needs: test
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: android } }
     steps:
@@ -36,19 +65,54 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: "8.10.2" }
-      - run: gradle assembleRelease --no-daemon
-      - run: |
-          mkdir -p out
+        with: { gradle-version: "8.11.1" }
+      # Release key for Google Play, from secrets (base64 keystore + passwords). Without it: debug-signed builds.
+      - name: Release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.NAZZIL_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "NAZZIL_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Release key configured."
+          else
+            echo "::warning::No NAZZIL_KEYSTORE_B64 secret: APK/AAB are debug-signed (fine for GitHub, not accepted by Google Play)."
+          fi
+      - name: Build APKs and Play bundle (AAB)
+        env:
+          NAZZIL_KEYSTORE_PASSWORD: ${{ secrets.NAZZIL_KEYSTORE_PASSWORD }}
+          NAZZIL_KEY_ALIAS: ${{ secrets.NAZZIL_KEY_ALIAS }}
+          NAZZIL_KEY_PASSWORD: ${{ secrets.NAZZIL_KEY_PASSWORD }}
+        run: gradle assembleRelease bundleRelease --no-daemon
+      - name: Collect outputs
+        run: |
+          mkdir -p out play
           for f in app/build/outputs/apk/release/*.apk; do
             n=$(basename "$f" | sed 's/app-/Nazzil-/; s/-release//')
             cp "$f" "out/$n"
           done
-          ls -la out
+          cp app/build/outputs/bundle/release/app-release.aab play/Nazzil-play.aab
+          ls -la out play
+      # Google Play rejects native libraries that aren't 16 KB page aligned (Android 15+ devices).
+      - name: Check 16 KB page alignment of native libraries
+        run: |
+          mkdir -p /tmp/so && unzip -qo out/Nazzil-arm64-v8a.apk 'lib/arm64-v8a/*.so' -d /tmp/so
+          bad=0
+          for so in /tmp/so/lib/arm64-v8a/*.so; do
+            al=$(readelf -lW "$so" 2>/dev/null | awk '/LOAD/{print $NF}' | sort -u | head -1)
+            [ -z "$al" ] && continue   # data-only payloads (e.g. *.zip.so) have no LOAD segments
+            echo "$(basename "$so"): $al"
+            [ $((al)) -lt 16384 ] && bad=1
+          done
+          [ $bad -eq 0 ] || { echo "::error::Native library not 16 KB aligned"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: Nazzil-Android
           path: android/out/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nazzil-GooglePlay-Bundle
+          path: android/play/*.aab
 
   # Publishes (or refreshes) the GitHub Release for the version in desktop/package.json.
   release:
@@ -60,7 +124,7 @@ jobs:
       - id: v
         run: echo "version=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
-        with: { path: dist, merge-multiple: true }
+        with: { path: dist, merge-multiple: true, pattern: "Nazzil-{Windows,Android}" }
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}

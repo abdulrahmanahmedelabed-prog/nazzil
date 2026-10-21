@@ -4,8 +4,8 @@ const t = NzI18n.t;
 const HISTORY = "nazil.history.v1", PREFS = "nazil.prefs.v2";
 
 /* ---------- Platform bridge ----------
-   One async RPC for both platforms:
-   - Windows (Electron): POST /api/<method> to the local server.
+   One async RPC for every platform:
+   - Windows (Electron) and phone browsers in LAN mode: POST /api/<method> to the local server.
    - Android: window.NazzilAndroid.call(method, json, id) → native calls window.__nzReply(id, json). */
 const android = window.NazzilAndroid;
 const pending = new Map();
@@ -59,6 +59,7 @@ function rpcHttp(method, args) {
 
 /* ---------- Helpers ---------- */
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -69,26 +70,39 @@ function fmtDur(s) {
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
   return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0");
 }
-function show(html, error = false) {
-  const el = $("message");
-  el.hidden = !html;
-  el.className = "message" + (error ? " error" : "");
-  el.innerHTML = html || "";
+/** Short-lived notification. `text` is plain text (escaped here); errors stay longer. */
+function toast(text, error = false) {
+  if (!text) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (error ? " error" : "");
+  el.setAttribute("role", error ? "alert" : "status");
+  el.innerHTML = `<span>${esc(t(text))}</span><button type="button" aria-label="${esc(t("إغلاق"))}">${icon("x")}</button>`;
+  const close = () => el.remove();
+  el.querySelector("button").onclick = close;
+  const box = $("toasts");
+  box.appendChild(el);
+  while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(close, error ? 7000 : 3200);
 }
 const looksLikeUrl = s => /^https?:\/\/\S+\.\S+/i.test((s || "").trim());
 /** All http(s) links in a piece of text, de-duplicated, in order. */
 const extractUrls = text => [...new Set((String(text || "").match(/https?:\/\/[^\s"'<>]+/gi) || []).map(u => u.replace(/[),.;]+$/, "")))];
+const kindOf = () => new FormData($("form")).get("kind");
+const isAudio = k => k === "mp3" || k === "m4a";
 
 /* ---------- Preferences ---------- */
-const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", meta: true, subs: false, sponsor: false, parallel: "3", autoClip: true, theme: "", rate: "", cookies: "", cover: "thumb", coverAt: "", coverImage: "", coverName: "", useLogin: true }, store.get(PREFS, {}));
+const EXTRA_DEFAULTS = { meta: true, subs: false, sponsor: false, cover: "thumb", coverAt: "" };
+const prefs = Object.assign({ kind: "mp3", quality: "1080", abr: "0", parallel: "3", autoClip: true, theme: "", rate: "", cookies: "",
+  coverImage: "", coverName: "", useLogin: true }, EXTRA_DEFAULTS, store.get(PREFS, {}));
 function savePrefs() {
   Object.assign(prefs, {
-    kind: new FormData($("form")).get("kind"), quality: $("quality").value, abr: $("abr").value,
+    kind: kindOf(), quality: $("quality").value, abr: $("abr").value,
     meta: $("meta").checked, subs: $("subs").checked, sponsor: $("sponsor").checked,
     parallel: $("parallel").value, autoClip: $("autoClip").checked, rate: $("rate").value, cookies: $("cookies").value, useLogin: $("useLogin").checked,
     cover: (document.querySelector("input[name=cover]:checked") || {}).value || "thumb", coverAt: $("coverAt").value.trim(),
   });
   store.set(PREFS, prefs);
+  renderSummary();
 }
 function applyPrefs() {
   const k = document.querySelector(`input[name=kind][value="${prefs.kind}"]`);
@@ -100,19 +114,25 @@ function applyPrefs() {
   const c = document.querySelector(`input[name=cover][value="${prefs.cover}"]`);
   if (c) c.checked = true;
   $("coverAt").value = prefs.coverAt; $("coverName").textContent = prefs.coverName || "";
+  applyTheme();
+  syncKind();
+}
+function applyTheme() {
   // Follow the device's light/dark setting until the user picks one.
   const light = prefs.theme ? prefs.theme === "light" : matchMedia("(prefers-color-scheme: light)").matches;
   document.body.classList.toggle("light", light);
-  syncKind();
+  $("themeBtn").querySelector("use").setAttribute("href", light ? "#i-moon" : "#i-sun");
+  document.querySelector('meta[name="theme-color"]').content = light ? "#f3f5f0" : "#0b0d11";
+  if (android) rpc("theme", { light }).catch(() => {}); // match the Android status/navigation bars
 }
 function syncKind() {
-  const kind = new FormData($("form")).get("kind");
-  const audio = kind === "mp3" || kind === "m4a";
+  const kind = kindOf(), audio = isAudio(kind);
   $("videoQ").classList.toggle("off", audio);
-  $("abr").disabled = kind !== "mp3";
   $("audioQ").classList.toggle("off", kind !== "mp3");
   $("coverBox").hidden = !audio;
+  $("subsRow").hidden = audio;
   syncCover();
+  renderSummary();
 }
 function syncCover() {
   const c = (document.querySelector("input[name=cover]:checked") || {}).value;
@@ -120,11 +140,57 @@ function syncCover() {
   $("coverCustom").hidden = c !== "custom";
 }
 
+/* ---------- Add-ons: summary chips + drawer on small screens ---------- */
+function activeExtras() {
+  const audio = isAudio(kindOf()), out = [];
+  if ($("playlist").checked) out.push(["layers", t("قائمة كاملة")]);
+  const from = $("trimFrom").value.trim(), to = $("trimTo").value.trim();
+  if (from || to) out.push(["scissors", `\u2066${from || "0:00"}–${to || "…"}\u2069`]); // LTR isolate so times don't flip in Arabic
+  if (audio && prefs.cover !== "thumb") out.push(["image", t({ frame: "لقطة من الفيديو", custom: "صورة من جهازي", none: "بدون صورة" }[prefs.cover])]);
+  if (!audio && prefs.subs) out.push(["cc", t("ترجمة")]);
+  if (prefs.sponsor) out.push(["zap", "SponsorBlock"]);
+  if (!prefs.meta) out.push(["tag", t("بلا بيانات")]);
+  return out;
+}
+function renderSummary() {
+  const list = activeExtras();
+  $("summary").innerHTML = list.map(([i, label]) => `<span class="chip">${icon(i)}<bdi>${esc(label)}</bdi></span>`).join("");
+  $("extrasCount").textContent = list.length || "";
+}
+function setExtras(open) {
+  document.body.classList.toggle("extras-open", open);
+  $("scrim").hidden = !open;
+  $("extrasBtn").setAttribute("aria-expanded", String(open));
+  if (open) $("extras").querySelector("input,button")?.focus({ preventScroll: true });
+}
+$("extrasBtn").addEventListener("click", () => setExtras(true));
+$("extrasClose").addEventListener("click", () => setExtras(false));
+$("scrim").addEventListener("click", () => setExtras(false));
+$("extrasReset").addEventListener("click", () => {
+  Object.assign(prefs, EXTRA_DEFAULTS);
+  $("playlist").checked = false; $("trimFrom").value = ""; $("trimTo").value = "";
+  store.set(PREFS, prefs);
+  applyPrefs();
+});
+["playlist", "trimFrom", "trimTo"].forEach(id => $(id).addEventListener("input", renderSummary));
+
+/* ---------- Tabs ---------- */
+function selectTab(which) {
+  const q = which === "queue";
+  $("tabQueue").setAttribute("aria-selected", String(q));
+  $("tabHistory").setAttribute("aria-selected", String(!q));
+  $("queue").hidden = !q;
+  $("historyPane").hidden = q;
+}
+$("tabQueue").addEventListener("click", () => selectTab("queue"));
+$("tabHistory").addEventListener("click", () => selectTab("history"));
+
 /* ---------- Preview ---------- */
 let infoTimer, infoFor = "", lastInfo = null;
 function queueInfo() {
   clearTimeout(infoTimer);
   const url = $("url").value.trim();
+  $("clearUrl").hidden = !url;
   const urls = extractUrls(url);
   if (urls.length > 1) {
     infoFor = url; lastInfo = null;
@@ -155,7 +221,7 @@ async function loadInfo(url) {
       i.site || "",
     ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join("");
     box.innerHTML = `${i.thumbnail ? `<img src="${esc(i.thumbnail)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<div class="meta"><b>${esc(i.title || t("بدون عنوان"))}</b><small>${esc(i.uploader || "")}</small><div class="chips">${chips}</div></div>`;
-    if (i.playlist) $("playlist").checked = true;
+    if (i.playlist) { $("playlist").checked = true; renderSummary(); }
     if (i.height) {
       // Hide resolutions the source doesn't have.
       [...$("quality").options].forEach(o => { o.hidden = o.value !== "best" && +o.value > i.height; });
@@ -165,18 +231,19 @@ async function loadInfo(url) {
     if (url !== infoFor) return;
     lastInfo = null;
     box.className = "preview loading";
-    box.innerHTML = `<span style="color:var(--bad)">${esc(t(e.message))}</span>`;
+    box.innerHTML = `<span class="err">${esc(t(e.message))}</span>`;
   }
 }
 
 /* ---------- Queue ---------- */
 let pollTimer;
-const seen = new Set(JSON.parse(sessionStorage.getItem("nz.seen") || "[]"));
+const seen = new Set((() => { try { return JSON.parse(sessionStorage.getItem("nz.seen") || "[]"); } catch { return []; } })());
+const emptyState = (ic, title, hint) => `<div class="empty">${icon(ic)}<b>${esc(t(title))}</b>${hint ? `<small>${esc(t(hint))}</small>` : ""}</div>`;
 function renderJobs(jobs) {
   const box = $("queue");
   const active = jobs.filter(j => j.state === "queued" || j.state === "working").length;
-  $("queueCount").textContent = active ? `· ${active} ${t("جارٍ")}` : "";
-  if (!jobs.length) { box.innerHTML = `<div class="history-empty">${esc(t("لا توجد تنزيلات جارية"))}</div>`; return; }
+  $("queueCount").textContent = active || "";
+  if (!jobs.length) { box.innerHTML = emptyState("dl", "لا توجد تنزيلات بعد", "الصق رابطًا في الأعلى أو اسحبه إلى النافذة."); return; }
   box.innerHTML = jobs.map(j => {
     const pct = Math.max(0, Math.min(100, j.progress || 0));
     let line;
@@ -188,14 +255,14 @@ function renderJobs(jobs) {
       : `<a href="#" data-open="${esc(j.file || "")}">${t(j.count > 1 ? "فتح المجلد" : "فتح")}</a>`);
     else if (j.state === "cancelled") line = `<span>${t("أُلغي")}</span>`;
     else line = `<span>${esc(t(j.error || "تعذر إكمال العملية"))}</span>`;
-    const b = (act, icon, label) => `<button data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon}</button>`;
+    const b = (act, ic, label) => `<button type="button" data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon(ic)}</button>`;
     const active = j.state === "queued" || j.state === "working";
     const btn = '<span class="job-actions">' + (
-      active ? b("pause", "⏸", "إيقاف مؤقت") + b("cancel", "✕", "إلغاء")
-      : j.state === "paused" ? b("resume", "▶", "استئناف") + b("cancel", "✕", "إلغاء")
-      : j.state === "done" ? b("dismiss", "–", "إخفاء")
-      : b("resume", "↻", "إعادة المحاولة") + b("dismiss", "–", "إخفاء")) + "</span>";
-    return `<div class="job ${esc(j.state)}"><div class="job-top"><span class="file-icon">${esc(j.kind.toUpperCase())}</span><strong title="${esc(j.title)}">${esc(j.title)}</strong>${btn}</div><div class="bar"><i style="width:${j.state === "done" ? 100 : pct}%"></i></div><small>${line}</small></div>`;
+      active ? b("pause", "pause", "إيقاف مؤقت") + b("cancel", "x", "إلغاء")
+      : j.state === "paused" ? b("resume", "play", "استئناف") + b("cancel", "x", "إلغاء")
+      : j.state === "done" ? b("dismiss", "x", "إخفاء")
+      : b("resume", "retry", "إعادة المحاولة") + b("dismiss", "x", "إخفاء")) + "</span>";
+    return `<div class="job ${esc(j.state)}"><div class="job-top"><span class="file-icon">${esc(j.kind.toUpperCase())}</span><strong title="${esc(j.title)}">${esc(j.title)}</strong>${btn}</div><div class="bar"><i style="width:${j.state === "done" ? 100 : pct}%"></i></div><div class="job-line">${line}</div></div>`;
   }).join("");
 }
 async function pollJobs() {
@@ -206,7 +273,7 @@ async function pollJobs() {
     for (const j of jobs) {
       if (j.state === "done" && !seen.has(j.id)) {
         seen.add(j.id);
-        sessionStorage.setItem("nz.seen", JSON.stringify([...seen]));
+        try { sessionStorage.setItem("nz.seen", JSON.stringify([...seen])); } catch {}
         saveHistory({ file: isWeb() ? `/dl/${j.id}/0` : j.file, web: isWeb(), name: j.title, kind: j.kind, count: j.count, at: Date.now() });
       }
     }
@@ -225,12 +292,13 @@ function saveHistory(item) {
 }
 function renderHistory() {
   const all = store.get(HISTORY, []);
-  $("historySearch").hidden = all.length < 6;
+  $("historySearch").parentElement.hidden = all.length < 6;
+  $("clearHistory").hidden = !all.length;
   const q = $("historySearch").value.trim().toLowerCase();
-  const rows = (q ? all.filter(x => String(x.name).toLowerCase().includes(q)) : all).slice(0, 60);
-  if (q && !rows.length) { $("history").innerHTML = `<div class="history-empty">${esc(t("لا نتائج"))}</div>`; return; }
-  $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString(NzI18n.lang)}${x.count > 1 ? ` · ${x.count} ${t("ملف")}` : ""}</small></div>${x.web ? `<a href="${esc(x.file)}" download aria-label="${esc(t("تنزيل إلى هذا الجهاز"))}">↓</a>` : `<a href="#" data-open="${esc(x.file)}" aria-label="${esc(t("فتح الملف"))}">↗</a>`}</div>`).join("")
-    : `<div class="history-empty">${esc(t("لا توجد تنزيلات بعد"))}<br><small>${esc(t("ستظهر ملفاتك هنا"))}</small></div>`;
+  const rows = (q ? all.filter(x => String(x.name).toLowerCase().includes(q)) : all).slice(0, 100);
+  if (q && !rows.length) { $("history").innerHTML = emptyState("search", "لا نتائج"); return; }
+  $("history").innerHTML = rows.length ? rows.map(x => `<div class="history-item"><span class="file-icon">${esc((x.kind || "").toUpperCase())}</span><div><strong title="${esc(x.name)}">${esc(x.name)}</strong><small>${new Date(x.at).toLocaleDateString(NzI18n.lang)}${x.count > 1 ? ` · ${x.count} ${t("ملف")}` : ""}</small></div>${x.web ? `<a href="${esc(x.file)}" download aria-label="${esc(t("تنزيل إلى هذا الجهاز"))}">${icon("dl")}</a>` : `<a href="#" data-open="${esc(x.file)}" aria-label="${esc(t("فتح الملف"))}">${icon("ext")}</a>`}</div>`).join("")
+    : emptyState("history", "السجل فارغ", "ستظهر ملفاتك المكتملة هنا.");
 }
 
 /* ---------- Actions ---------- */
@@ -244,34 +312,35 @@ $("form").addEventListener("submit", async e => {
   e.preventDefault();
   const urls = extractUrls($("url").value);
   const url = urls[0] || $("url").value.trim();
-  if (!looksLikeUrl(url)) { show(esc(t("ألصق رابطًا صحيحًا يبدأ بـ https://")), true); $("url").focus(); return; }
+  if (!looksLikeUrl(url)) { toast("ألصق رابطًا صحيحًا يبدأ بـ https://", true); $("url").focus(); return; }
   savePrefs();
-  const audioKind = prefs.kind === "mp3" || prefs.kind === "m4a";
-  if (audioKind && prefs.cover === "custom" && !prefs.coverImage) { show(esc(t("اختر صورة الغلاف أولًا.")), true); return; }
+  if (isAudio(prefs.kind) && prefs.cover === "custom" && !prefs.coverImage) { toast("اختر صورة الغلاف أولًا.", true); setExtras(true); return; }
   $("submit").disabled = true;
   try {
     const body = {
       url, kind: prefs.kind, quality: prefs.quality, abr: prefs.abr,
       playlist: $("playlist").checked, meta: prefs.meta, subs: prefs.subs, sponsor: prefs.sponsor,
-      rate: prefs.rate, cookies: status.platform === "android" ? "" : prefs.cookies,
+      rate: prefs.rate, cookies: status.platform === "windows" ? prefs.cookies : "",
       cover: prefs.cover, coverAt: parseTime(prefs.coverAt), coverImage: prefs.coverImage, useLogin: prefs.useLogin,
       from: parseTime($("trimFrom").value), to: parseTime($("trimTo").value),
       title: lastInfo?.title || url,
     };
     if (urls.length > 1) {
       for (const u of urls) await rpc("download", { ...body, url: u, title: u, playlist: false });
-      show(esc(t("أُضيفت الروابط إلى قائمة التنزيل ✓")));
+      toast("أُضيفت الروابط إلى قائمة التنزيل ✓");
     } else {
       await rpc("download", body);
-      show(esc(t("أُضيف إلى قائمة التنزيل ✓")));
+      toast("أُضيف إلى قائمة التنزيل ✓");
     }
-    if (innerWidth < 760) $("queue").scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => show(""), 2500);
+    selectTab("queue");
+    if (innerWidth <= 980) $("tabQueue").scrollIntoView({ behavior: "smooth", block: "start" });
+    // One-off add-ons reset after use; lasting preferences (cover, metadata…) stay.
     $("url").value = ""; $("trimFrom").value = ""; $("trimTo").value = ""; $("playlist").checked = false;
-    $("preview").hidden = true; infoFor = ""; lastInfo = null;
+    $("preview").hidden = true; $("clearUrl").hidden = true; infoFor = ""; lastInfo = null;
+    renderSummary();
     pollJobs();
   } catch (err) {
-    show(esc(t(err.message)), true);
+    toast(err.message, true);
   } finally {
     $("submit").disabled = false;
   }
@@ -279,9 +348,9 @@ $("form").addEventListener("submit", async e => {
 
 document.addEventListener("click", e => {
   const open = e.target.closest("[data-open]");
-  if (open) { e.preventDefault(); rpc("open", { file: open.dataset.open }).catch(err => show(esc(t(err.message)), true)); return; }
+  if (open) { e.preventDefault(); rpc("open", { file: open.dataset.open }).catch(err => toast(err.message, true)); return; }
   const act = e.target.closest("[data-act]");
-  if (act) rpc(act.dataset.act, { id: act.dataset.id }).then(pollJobs, err => show(esc(t(err.message)), true));
+  if (act) rpc(act.dataset.act, { id: act.dataset.id }).then(pollJobs, err => toast(err.message, true));
 });
 
 $("url").addEventListener("input", queueInfo);
@@ -291,24 +360,34 @@ $("url").addEventListener("paste", e => {
   if (urls.length > 1) { e.preventDefault(); $("url").value = urls.join(" "); }
   setTimeout(queueInfo, 0);
 });
-// Browse: pick a platform, then the in-app browser shows a download button on its video pages.
-$("siteGrid").innerHTML = NzSites.SITES.map(x => `<button type="button" class="site" data-site="${x.id}"><i style="background:${x.color}">${x.icon}</i><span>${esc(x.name)}</span></button>`).join("");
-$("browseBtn").addEventListener("click", () => $("sites").showModal());
+// Ctrl+V anywhere (outside a text field) pastes the link.
+document.addEventListener("paste", e => {
+  if (e.target.closest("input,textarea,select")) return;
+  const urls = extractUrls(e.clipboardData && e.clipboardData.getData("text"));
+  if (!urls.length) return;
+  e.preventDefault();
+  $("url").value = urls.join(" ");
+  queueInfo();
+  $("url").focus();
+});
+
+// Browse: the in-app browser shows a "Download with Nazzil" button on the platform's video pages.
+$("siteGrid").innerHTML = NzSites.SITES.map(x => `<button type="button" class="site" data-site="${x.id}" style="background:${x.color}" title="${esc(x.name)}" aria-label="${esc(x.name)}">${x.icon}</button>`).join("");
 $("siteGrid").addEventListener("click", e => {
   const b = e.target.closest("[data-site]");
   if (!b) return;
   const site = NzSites.byId(b.dataset.site);
-  $("sites").close();
   if (isWeb()) {
     // In a phone browser there's no in-app browser: open the site in a new tab and paste the link back.
     window.open(site.mobileUrl || site.url, "_blank", "noopener");
-    show(esc(t("افتح الفيديو، انسخ رابطه، ثم ارجع والصقه هنا.")));
+    toast("افتح الفيديو، انسخ رابطه، ثم ارجع والصقه هنا.");
     return;
   }
   rpc("browse", { site: site.id, name: site.name, url: site.url, mobileUrl: site.mobileUrl || "", match: site.match })
-    .catch(err => show(esc(t(err.message)), true));
+    .catch(err => toast(err.message, true));
 });
 $("clearUrl").addEventListener("click", () => { $("url").value = ""; queueInfo(); $("url").focus(); });
+$("pasteBtn").addEventListener("click", () => pasteFromClipboard(false));
 $("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); $("historySearch").value = ""; renderHistory(); });
 $("historySearch").addEventListener("input", renderHistory);
 document.querySelectorAll("input[name=cover]").forEach(r => r.addEventListener("change", () => { syncCover(); savePrefs(); }));
@@ -320,8 +399,7 @@ $("pickCover").addEventListener("click", async () => {
     prefs.coverImage = r.path; prefs.coverName = r.name || r.path;
     $("coverName").textContent = prefs.coverName;
     savePrefs();
-    show("");
-  } catch (e) { show(esc(t(e.message)), true); }
+  } catch (e) { toast(e.message, true); }
 });
 document.querySelectorAll("input[name=kind]").forEach(r => r.addEventListener("change", () => { syncKind(); savePrefs(); }));
 ["quality", "abr", "meta", "subs", "sponsor", "parallel", "autoClip", "rate", "cookies", "useLogin"].forEach(id => $(id).addEventListener("change", () => {
@@ -333,40 +411,53 @@ async function pasteFromClipboard(silent) {
   try {
     const text = (await navigator.clipboard.readText() || "").trim();
     const urls = extractUrls(text), joined = urls.join(" ");
-    if (urls.length && joined !== $("url").value.trim()) { $("url").value = joined; queueInfo(); if (!silent) show(esc(t("تم لصق الرابط من الحافظة."))); }
-  } catch {}
+    if (!urls.length) { if (!silent) toast("لا يوجد رابط في الحافظة.", true); return; }
+    if (joined !== $("url").value.trim()) { $("url").value = joined; queueInfo(); }
+  } catch { if (!silent) toast("اسمح بالوصول إلى الحافظة أو الصق الرابط يدويًا.", true); }
 }
-const drop = $("dropzone");
-["dragenter", "dragover"].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.add("drag"); }));
-["dragleave", "drop"].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.remove("drag"); }));
-drop.addEventListener("drop", e => {
+
+// Drag a link anywhere onto the window.
+let dragDepth = 0;
+const isLinkDrag = e => [...(e.dataTransfer?.types || [])].some(x => x === "text/uri-list" || x === "text/plain");
+document.addEventListener("dragenter", e => { if (!isLinkDrag(e)) return; e.preventDefault(); dragDepth++; $("dropOverlay").hidden = false; });
+document.addEventListener("dragover", e => { if (isLinkDrag(e)) e.preventDefault(); });
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("dropOverlay").hidden = true; } });
+document.addEventListener("drop", e => {
+  dragDepth = 0; $("dropOverlay").hidden = true;
   const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text");
   const urls = extractUrls(text);
-  if (urls.length) { $("url").value = urls.join(" "); queueInfo(); }
+  if (!urls.length) return;
+  e.preventDefault();
+  $("url").value = urls.join(" ");
+  queueInfo();
 });
-drop.addEventListener("click", () => pasteFromClipboard(false));
-drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pasteFromClipboard(false); } });
 window.addEventListener("focus", () => { if (prefs.autoClip && !$("url").value) pasteFromClipboard(true); });
 
 $("themeBtn").addEventListener("click", () => {
-  document.body.classList.toggle("light");
-  prefs.theme = document.body.classList.contains("light") ? "light" : "dark";
+  prefs.theme = document.body.classList.contains("light") ? "dark" : "light";
   store.set(PREFS, prefs);
+  applyTheme();
 });
-document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") $("form").requestSubmit(); });
+matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", () => { if (!prefs.theme) applyTheme(); });
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") $("form").requestSubmit();
+  if (e.key === "Escape" && document.body.classList.contains("extras-open")) setExtras(false);
+});
 
 /* ---------- Settings ---------- */
 let status = {};
 $("settingsBtn").addEventListener("click", () => $("settings").showModal());
 $("pickFolder").addEventListener("click", async () => {
-  try { const r = await rpc("pickFolder"); if (r.folder) $("folderPath").textContent = r.folder; } catch (e) { show(esc(t(e.message)), true); }
+  try { const r = await rpc("pickFolder"); if (r.folder) $("folderPath").textContent = r.folder; } catch (e) { toast(e.message, true); }
 });
-$("openFolder").addEventListener("click", () => rpc("open", { file: "" }).catch(() => {}));
+const openFolder = () => rpc("open", { file: "" }).catch(e => toast(e.message, true));
+$("openFolder").addEventListener("click", openFolder);
+$("openFolderTop").addEventListener("click", openFolder);
 $("updateBtn").addEventListener("click", async () => {
   const b = $("updateBtn");
   b.disabled = true; b.textContent = t("جارٍ التحديث…");
   try { const r = await rpc("update"); $("engineVer").textContent = `yt-dlp ${r.version || ""}`; b.textContent = t("مُحدَّث ✓"); }
-  catch (e) { b.textContent = t("فشل"); show(esc(t(e.message)), true); }
+  catch (e) { b.textContent = t("فشل"); toast(e.message, true); }
   finally { setTimeout(() => { b.disabled = false; b.textContent = t("تحديث"); }, 2500); }
 });
 
@@ -374,14 +465,15 @@ async function loadStatus() {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       status = await rpc("status");
-      $("tools").textContent = `yt-dlp ${status.yt_dlp ? "✓" : "✗"}  ·  FFmpeg ${status.ffmpeg ? "✓" : "✗"}`;
+      const ok = status.yt_dlp && status.ffmpeg;
+      $("tools").textContent = ok ? t(platformText()) : `yt-dlp ${status.yt_dlp ? "✓" : "✗"} · FFmpeg ${status.ffmpeg ? "✓" : "✗"}`;
       $("engineVer").textContent = `yt-dlp ${status.version || ""}`;
+      $("appVersion").textContent = status.appVersion || "";
       $("folderPath").textContent = status.folder || "—";
       $("pickFolder").hidden = !status.canPickFolder;
-      $("platform").textContent = t(platformText());
       $("cookiesRow").hidden = status.platform !== "windows"; // only the desktop can read browser cookies
       // In a phone browser (LAN mode) hide the controls that act on the computer itself.
-      for (const id of ["folderRow", "loginRow", "engineRow"]) $(id).hidden = isWeb();
+      for (const id of ["folderRow", "loginRow", "engineRow", "openFolderTop"]) $(id).hidden = isWeb();
       $("lanRow").hidden = status.platform !== "windows";
       if (status.platform === "windows") refreshLan();
       rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
@@ -420,7 +512,7 @@ async function refreshLan(enable) {
     $("lanUrl").textContent = r.url || "";
     $("lanQr").hidden = !r.qr;
     if (r.qr) $("lanQr").src = r.qr;
-  } catch (e) { show(esc(t(e.message)), true); }
+  } catch (e) { toast(e.message, true); }
 }
 $("lanToggle").addEventListener("change", () => refreshLan($("lanToggle").checked));
 $("lanReset").addEventListener("click", () => refreshLan("reset"));
@@ -433,7 +525,7 @@ const newer = (a, b) => {
   return false;
 };
 async function checkForUpdate(current) {
-  if (!current) return;
+  if (!current || status.store) return; // store builds are updated by the store
   try {
     const r = await fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" } });
     if (!r.ok) return; // e.g. the repository is private
@@ -446,14 +538,23 @@ async function checkForUpdate(current) {
   } catch {}
 }
 
-// Android hands us a URL shared from another app.
-window.nazzilSetUrl = url => { $("url").value = extractUrls(url).join(" ") || url; queueInfo(); show(esc(t("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."))); };
+// Android back button: close whatever is open first; returns false when there's nothing to close.
+window.nazzilBack = () => {
+  const dlg = document.querySelector("dialog[open]");
+  if (dlg) { dlg.close(); return true; }
+  if (document.body.classList.contains("extras-open")) { setExtras(false); return true; }
+  return false;
+};
+
+// Android (share sheet / in-app browser) hands us a URL.
+window.nazzilSetUrl = url => { $("url").value = extractUrls(url).join(" ") || url; queueInfo(); toast("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."); };
 
 const platformText = () => status.platform === "android" ? "يعمل محليًا على Android" : status.platform === "web" ? "يعمل عبر كمبيوترك" : "يعمل محليًا على Windows";
 function applyLang() {
   NzI18n.translatePage();
   $("langBtn").textContent = NzI18n.lang === "en" ? "ع" : "EN";
-  if (status.platform) $("platform").textContent = t(platformText());
+  if (status.platform && status.yt_dlp && status.ffmpeg) $("tools").textContent = t(platformText());
+  renderSummary();
   renderHistory();
   pollJobs();
 }

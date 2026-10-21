@@ -1,118 +1,90 @@
 # نزّل — Nazzil
 
-تطبيق لتنزيل الفيديو والصوت، للمحتوى الذي تملكه أو لديك إذن بتنزيله. يعمل محليًا على جهازك: بلا حسابات ولا إعلانات ولا تتبع.
+<img src="assets/icon.svg" width="96" align="left" alt="">
+
+تطبيق لتنزيل الفيديو والصوت على **Windows** و**Android**، ومن **متصفح الجوال** عبر الكمبيوتر.
+بلا حسابات ولا إعلانات ولا تتبّع، وكل المعالجة تتم على جهازك.
+
+<br clear="left">
 
 ## التحميل — آخر إصدار
 
-الروابط التالية تنزّل دائمًا **أحدث إصدار** مباشرةً، فلا داعي لزيارة صفحة Releases.
+الروابط التالية تنزّل دائمًا **أحدث إصدار** مباشرةً.
 
-| المنصة | الملف | الحجم التقريبي |
-|---|---|---|
-| 🪟 Windows (مثبّت) | [**Nazzil-Setup.exe**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-Setup.exe) | ‎~195 MB |
-| 🪟 Windows (بلا تثبيت) | [**Nazzil-Portable.exe**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-Portable.exe) | ‎~195 MB |
-| 🤖 Android (أغلب الهواتف الحديثة) | [**Nazzil-arm64-v8a.apk**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-arm64-v8a.apk) | ‎~35 MB |
-| 🤖 Android (الهواتف القديمة 32-bit) | [**Nazzil-armeabi-v7a.apk**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-armeabi-v7a.apk) | ‎~33 MB |
-| 🤖 Android (يعمل على أي جهاز) | [**Nazzil-universal.apk**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-universal.apk) | ‎~93 MB |
+| المنصة | الملف |
+|---|---|
+| 🪟 Windows (مثبّت) | [**Nazzil-Setup.exe**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-Setup.exe) |
+| 🪟 Windows (بلا تثبيت) | [**Nazzil-Portable.exe**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-Portable.exe) |
+| 🤖 Android (أغلب الهواتف) | [**Nazzil-arm64-v8a.apk**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-arm64-v8a.apk) |
+| 🤖 Android (الهواتف القديمة 32-bit) | [**Nazzil-armeabi-v7a.apk**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-armeabi-v7a.apk) |
+| 🤖 Android (أي جهاز) | [**Nazzil-universal.apk**](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases/latest/download/Nazzil-universal.apk) |
 
-> لا تعرف نوع هاتفك؟ نزّل `Nazzil-universal.apk`.
-> في Windows قد تظهر رسالة SmartScreen لأن البرنامج غير موقّع رقميًا: اضغط «More info» ثم «Run anyway».
-> المستودع خاص حاليًا، فالروابط تعمل لمن سجّل الدخول وله صلاحية الوصول. اجعله عامًا لتعمل لأي شخص.
-
-سجل الإصدارات السابقة: [Releases](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases)
+سجل الإصدارات: [Releases](https://github.com/abdulrahmanahmedelabed-prog/nazzil/releases)
 
 ## المزايا
 
-| الميزة | نزّل |
-|---|---|
-| المواقع | YouTube وأكثر من 1000 موقع (TikTok, Instagram, X, Facebook, SoundCloud, Vimeo…) |
-| الصيغ | MP3 ‏(حتى 320kbps) · M4A ‏(بلا إعادة ترميز) · MP4 · WEBM |
-| الجودة | من 360p حتى 4K/8K، مع إخفاء الدقات غير المتاحة للمقطع |
-| تصفّح المنصات | افتح YouTube أو Facebook أو TikTok أو Instagram أو X أو SoundCloud أو Vimeo أو Twitch أو Dailymotion أو Reddit داخل التطبيق، واضغط «تنزيل بـ نزّل» على أي فيديو |
-| غلاف الصوت | لملفات MP3/M4A: صورة المقطع، أو لقطة من الفيديو عند ثانية تختارها، أو صورة من جهازك، أو بدون صورة |
-| معاينة | الصورة المصغرة والعنوان والقناة والمدة قبل التنزيل |
-| قائمة تنزيل | تنزيلات متزامنة (1–5) مع نسبة التقدم والسرعة والوقت المتبقي |
-| روابط متعددة | الصق قائمة روابط دفعة واحدة وتُضاف كلها |
-| لا يضيع شيء | في Windows تعود التنزيلات غير المكتملة بعد إغلاق البرنامج وفتحه |
-| إشعارات | إشعار عند اكتمال كل تنزيل أو فشله |
-| السجل | حتى 300 تنزيل مع بحث سريع |
-| التحديثات | تنبيه داخل التطبيق عند صدور نسخة جديدة |
-| إيقاف واستئناف | إيقاف مؤقت ومتابعة من حيث توقف، وإعادة محاولة التنزيلات الفاشلة |
-| في الخلفية | على Android يستمر التنزيل بعد مغادرة التطبيق، مع إشعار يعرض التقدم |
-| حد السرعة | 500KB/s حتى 10MB/s لترك الإنترنت لبقية الأجهزة |
-| المحتوى المقيّد | المقاطع المقيّدة بالعمر أو الخاصة بالأعضاء عبر جلسة متصفحك (Windows) |
-| تسجيل الدخول | ما تسجّل دخولك إليه داخل متصفح نزّل (Instagram، Facebook، TikTok…) يُستخدم تلقائيًا للتنزيل |
-| تحديث تلقائي | محرك التنزيل يتحدّث تلقائيًا مرة يوميًا على Windows وAndroid |
-| من الجوال بلا تثبيت | فعّل «الوصول من الجوال» في إعدادات نزّل على Windows وامسح رمز QR: يعمل نزّل في متصفح أي جهاز على نفس الواي فاي، والملف يُحفظ على الجوال مباشرةً |
-| اللغة | العربية والإنجليزية، مع اختيار تلقائي حسب لغة الجهاز |
-| قوائم التشغيل | تنزيل القائمة كاملة في مجلد مرتّب ومرقّم |
-| البيانات | تضمين الغلاف والعنوان والفنان والفصول |
-| الترجمة | تضمين الترجمة العربية والإنجليزية في الفيديو |
-| SponsorBlock | حذف الإعلانات المدمجة والترويج تلقائيًا |
-| القص | تنزيل جزء محدد فقط (من – إلى) |
-| الراحة | لصق تلقائي من الحافظة · مشاركة الرابط من أي تطبيق (Android) · اختيار مجلد الحفظ (Windows) · تحديث المحرك بضغطة |
-| الخصوصية | لا حسابات ولا إعلانات ولا تتبع. كل شيء على جهازك |
+- **صفحة واحدة:** الرابط والصيغة وزر التنزيل في المنتصف، والإضافات على جانب الشاشة (وفي الجوال درج جانبي).
+- **مصادر كثيرة:** الصق الرابط أو اسحبه إلى النافذة، أو شاركه إلى نزّل من أي تطبيق، أو تصفّح YouTube وFacebook وTikTok وInstagram وX وSoundCloud وVimeo وTwitch وDailymotion وReddit داخل التطبيق.
+- **الصيغ:** MP3 وM4A للصوت، وMP4 وWEBM للفيديو حتى 4K، مع معاينة قبل التنزيل.
+- **قائمة تنزيلات:** متزامنة، مع إيقاف واستئناف وإعادة محاولة، وتستمر في الخلفية، وتعود بعد إغلاق البرنامج.
+- **الإضافات:** قص جزء، قائمة تشغيل كاملة، البيانات والترجمة، SponsorBlock، وصورة غلاف الصوت (صورة المقطع، أو لقطة من الفيديو، أو صورة من جهازك، أو بدون).
+- **تسجيل الدخول:** ما تسجّل دخولك إليه داخل متصفح نزّل يُستخدم للمحتوى الذي يتطلب حسابًا.
+- **من الجوال بلا تثبيت:** فعّل «الوصول من الجوال» في إعدادات نزّل على Windows وامسح رمز QR.
+- **عربي وإنجليزي، داكن وفاتح.** يتحدّث محرك التنزيل تلقائيًا.
 
-| المنصة | التقنية | الملف الناتج |
-|---|---|---|
-| Windows | Electron + ‏yt-dlp.exe + ‏ffmpeg.exe مضمّنة | `Nazzil-Setup-1.0.0.exe` و `Nazzil-Portable-1.0.0.exe` |
-| Android | WebView + ‏[youtubedl-android](https://github.com/JunkFood02/youtubedl-android) (فيه yt-dlp و FFmpeg) | `Nazzil-universal.apk` وملفات APK لكل معمارية |
+## النشر على المتاجر
 
-## مقارنة بالبرامج المشهورة
+### Google Play
+1. أنشئ مفتاح توقيع **مرة واحدة واحتفظ به**. فقدانه يعني أنك لن تستطيع تحديث التطبيق أبدًا:
+   ```bash
+   keytool -genkeypair -v -keystore nazzil-release.jks -alias nazzil -keyalg RSA -keysize 4096 -validity 10000
+   base64 -w0 nazzil-release.jks   # انسخ الناتج
+   ```
+2. في المستودع: **Settings ← Secrets and variables ← Actions**، أضف:
+   `NAZZIL_KEYSTORE_B64` (ناتج base64)، `NAZZIL_KEYSTORE_PASSWORD`، `NAZZIL_KEY_ALIAS` (مثلًا `nazzil`)، `NAZZIL_KEY_PASSWORD`.
+3. بعد أي push ستجد في **Actions** الملف `Nazzil-GooglePlay-Bundle` (ملف `.aab`) لرفعه إلى Play Console.
+4. نصوص المتجر، وإجابات «أمان البيانات»، وإعلان الخدمة في المقدّمة: [`store/LISTING.md`](store/LISTING.md). الصور جاهزة في [`store/`](store).
+5. سياسة الخصوصية: [`PRIVACY.md`](PRIVACY.md). يحتاج المتجر رابطًا عامًا لها.
 
-| | نزّل | 4K Video Downloader | Seal (Android) | YTDLnis (Android) | Stacher (PC) |
-|---|---|---|---|---|---|
-| مجاني بالكامل بلا إعلانات | ✓ | ✗ (قوائم التشغيل والتنزيلات المتعددة مدفوعة) | ✓ | ✓ | ✓ |
-| Windows و Android | ✓ | Windows/Mac/Linux فقط | Android فقط | Android فقط | PC فقط |
-| أكثر من 1000 موقع | ✓ | عدد محدود | ✓ | ✓ | ✓ |
-| إيقاف واستئناف | ✓ | ✓ | ✗ | ✓ | ✗ |
-| قص مقطع | ✓ | ✗ | ✗ | ✓ | ✓ |
-| SponsorBlock | ✓ | ✗ | ✓ | ✓ | ✓ |
-| واجهة عربية | ✓ | ✓ | ✓ | ✓ | ✗ |
+### Microsoft Store
+1. أنشئ التطبيق في Partner Center، ثم انسخ من **Product identity**: Package/Identity Name وPublisher وPublisher display name.
+2. أضفها كـ secrets: `MSSTORE_IDENTITY_NAME`، `MSSTORE_PUBLISHER`، `MSSTORE_PUBLISHER_NAME`.
+3. سيُبنى ملف `Nazzil-Store.appx` في **Actions** (`Nazzil-MicrosoftStore`) لرفعه. المتجر يوقّعه بنفسه.
 
-## استخدام نزّل من متصفح الجوال (بدون تثبيت)
+> ⚠️ راجع ملاحظة سياسات المتاجر بخصوص YouTube قبل الرفع.
 
-1. افتح نزّل على الكمبيوتر ← الإعدادات ⚙ ← فعّل **الوصول من الجوال**.
-2. امسح رمز QR بكاميرا الجوال (يجب أن يكون على نفس شبكة الواي فاي).
-3. الصق الرابط واضغط «إضافة إلى التنزيلات»، ثم «تنزيل إلى هذا الجهاز».
+## الخصوصية والترخيص
 
-الرابط يحتوي مفتاحًا سريًا، فلا يستطيع غيرك على الشبكة استخدامه. لإلغائه اضغط «إنشاء رابط جديد».
+- [سياسة الخصوصية](PRIVACY.md): لا يجمع نزّل أي بيانات.
+- الترخيص: **GPL-3.0-or-later** ([LICENSE](LICENSE))، لأن التطبيق يضم مكتبات GPL (FFmpeg، youtubedl-android). التفاصيل في [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- نزّل فقط المحتوى الذي تملكه أو لديك إذن بتنزيله، والتزم بشروط كل منصة.
 
 ## البنية
 
 ```
-web/       الواجهة المشتركة (index.html, style.css, app.js, i18n.js) + ytdlp.js (بناء أوامر yt-dlp للمنصتين)
-desktop/   تطبيق Windows: خادم محلي على 127.0.0.1 يشغّل yt-dlp بدون shell
-android/   تطبيق Android: جسر JavaScript ‏(window.NazzilAndroid) بنفس الواجهة البرمجية
+web/       الواجهة المشتركة: index.html, style.css, app.js, i18n.js
+           ytdlp.js (أوامر yt-dlp للمنصتين) · sites.js (المنصات وروابط الفيديو)
+desktop/   Windows (Electron): خادم محلي على 127.0.0.1 + وضع الشبكة المحلية للجوال
+android/   Android: WebView + youtubedl-android (yt-dlp وFFmpeg وQuickJS مضمّنة)
+assets/    أيقونة التطبيق (SVG)
+store/     أصول المتاجر: الأيقونة، الصورة الترويجية، لقطات الشاشة، النصوص
+tests/     اختبارات آلية تعمل قبل كل بناء: node --test "tests/*.test.js"
 ```
-
-الملفات تُحفظ في مجلد **التنزيلات/Nazzil** على المنصتين.
-
-## الإصدارات
-
-كل push على `main` يبني التطبيقين عبر GitHub Actions (الملفات في **Artifacts**).
-لإصدار جديد ادفع وسمًا مثل `v2.1.0`، وستُرفق الملفات بصفحة **Releases** تلقائيًا.
 
 ## البناء محليًا
 
 **Windows**
 ```powershell
 cd desktop
-Copy-Item -Recurse ..\web .\web
+Copy-Item -Recurse ..\web .\web; New-Item -ItemType Directory legal; Copy-Item ..\LICENSE legal\LICENSE.txt; Copy-Item ..\THIRD_PARTY_NOTICES.md legal\
 npm install
-npm run fetch-bin   # ينزّل yt-dlp.exe و ffmpeg.exe
-npm start           # تشغيل للتجربة
-npm run dist        # إنشاء ملفات exe داخل dist\
+npm run fetch-bin   # yt-dlp.exe و ffmpeg.exe و deno.exe
+npm start           # للتجربة
+npm run dist        # ملفات exe داخل dist\
 ```
 
-**Android** (يحتاج Android SDK و JDK 17)
+**Android** (Android SDK وJDK 17 وGradle 8.11+)
 ```bash
 cd android
-gradle assembleRelease
+gradle assembleRelease bundleRelease
 ```
-
-## ملاحظات
-
-- خادم Windows يستمع على 127.0.0.1 فقط ويرفض الطلبات القادمة من مواقع أخرى، ويشغّل yt-dlp بدون shell.
-- على Android يُحدَّث yt-dlp تلقائيًا عند التشغيل، لأن YouTube يغيّر موقعه باستمرار.
-- ملف APK موقّع بمفتاح debug ليُثبَّت مباشرة. للنشر على Google Play استخدم مفتاحك الخاص.
-- على Android: شارك رابط YouTube إلى «نزّل» من أي تطبيق، أو اضغط على منطقة الإسقاط للصق الرابط من الحافظة.

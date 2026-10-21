@@ -86,8 +86,8 @@ app.whenReady().then(async () => {
   const port = started.port;
   stopAll = started.stopAll;
   win = new BrowserWindow({
-    width: 1180, height: 860, minWidth: 380, minHeight: 600,
-    backgroundColor: "#0b0d11", title: "نزّل", autoHideMenuBar: true,
+    width: 1280, height: 820, minWidth: 380, minHeight: 560,
+    backgroundColor: "#0b0d11", title: "نزّل", autoHideMenuBar: true, icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   // Allow the page to read the clipboard for auto-paste.

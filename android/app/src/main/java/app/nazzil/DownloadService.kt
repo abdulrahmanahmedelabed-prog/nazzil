@@ -60,6 +60,14 @@ class DownloadService : Service() {
             .build()
     }
 
+    // Android 15+ limits dataSync foreground services (6h/day). When time is up the service must stop at once,
+    // or the system crashes the app; downloads already running keep going without the foreground notification.
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        handler.removeCallbacks(tick)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     override fun onDestroy() { handler.removeCallbacks(tick); super.onDestroy() }
     override fun onBind(intent: Intent?): IBinder? = null
 
