@@ -53,7 +53,9 @@ class BrowseActivity : AppCompatActivity() {
                     // Stay in the in-app browser for web pages; ignore app deep links (intent://, fb://, snssdk…)
                     // so the user isn't bounced out to the platform's own app.
                     val scheme = request.url.scheme ?: ""
-                    return scheme != "http" && scheme != "https"
+                    if (scheme != "http" && scheme != "https") return true
+                    // Store edition: never browse to platforms it doesn't download from.
+                    return StorePolicy.ENABLED && !StorePolicy.allows(request.url.toString())
                 }
                 override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) = refresh(url)
             }

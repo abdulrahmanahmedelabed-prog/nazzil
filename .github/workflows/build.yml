@@ -78,20 +78,21 @@ jobs:
           else
             echo "::warning::No NAZZIL_KEYSTORE_B64 secret: APK/AAB are debug-signed (fine for GitHub, not accepted by Google Play)."
           fi
-      - name: Build APKs and Play bundle (AAB)
+      - name: Build full APKs (GitHub) and the Google Play edition (AAB + test APK)
         env:
           NAZZIL_KEYSTORE_PASSWORD: ${{ secrets.NAZZIL_KEYSTORE_PASSWORD }}
           NAZZIL_KEY_ALIAS: ${{ secrets.NAZZIL_KEY_ALIAS }}
           NAZZIL_KEY_PASSWORD: ${{ secrets.NAZZIL_KEY_PASSWORD }}
-        run: gradle assembleRelease bundleRelease --no-daemon
+        run: gradle assembleFullRelease assemblePlayRelease bundlePlayRelease --no-daemon
       - name: Collect outputs
         run: |
           mkdir -p out play
-          for f in app/build/outputs/apk/release/*.apk; do
-            n=$(basename "$f" | sed 's/app-/Nazzil-/; s/-release//')
+          for f in app/build/outputs/apk/full/release/*.apk; do
+            n=$(basename "$f" | sed 's/app-full-/Nazzil-/; s/-release//')
             cp "$f" "out/$n"
           done
-          cp app/build/outputs/bundle/release/app-release.aab play/Nazzil-play.aab
+          cp app/build/outputs/bundle/playRelease/app-play-release.aab play/NazzilOpen-play.aab
+          cp app/build/outputs/apk/play/release/app-play-universal-release.apk play/NazzilOpen-test.apk
           ls -la out play
       # Google Play rejects native libraries that aren't 16 KB page aligned (Android 15+ devices).
       - name: Check 16 KB page alignment of native libraries
@@ -112,7 +113,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Nazzil-GooglePlay-Bundle
-          path: android/play/*.aab
+          path: android/play/*
 
   # Publishes (or refreshes) the GitHub Release for the version in desktop/package.json.
   release:

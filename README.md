@@ -34,17 +34,26 @@
 
 ## النشر على المتاجر
 
-### Google Play
+### Google Play — نسخة «نزّل مفتوح»
+Google Play لا يقبل تطبيقات التنزيل من YouTube والمنصات التي تمنع شروطها التنزيل. لذلك يُبنى من نفس الكود إصداران:
+
+| | `full` (GitHub) | `play` — «نزّل مفتوح» (Google Play) |
+|---|---|---|
+| الحزمة | `app.nazzil` | `app.nazzil.open` |
+| المصادر | YouTube وكل المنصات | Internet Archive، Wikimedia Commons، PeerTube، البودكاست، الروابط المباشرة |
+| تحديث المحرك | تلقائي من الإنترنت | عبر Google Play فقط (سياسة Play تمنع تنزيل كود قابل للتنفيذ) |
+
+الحظر في النسخة `play` مفروض على ثلاث طبقات: في الواجهة، وفي كود Android الأصلي، وفي محرك yt-dlp نفسه (`--use-extractors`). واختبار آلي يضمن تطابق قائمة الحظر بين JavaScript وKotlin.
+
 1. أنشئ مفتاح توقيع **مرة واحدة واحتفظ به**. فقدانه يعني أنك لن تستطيع تحديث التطبيق أبدًا:
    ```bash
    keytool -genkeypair -v -keystore nazzil-release.jks -alias nazzil -keyalg RSA -keysize 4096 -validity 10000
    base64 -w0 nazzil-release.jks   # انسخ الناتج
    ```
 2. في المستودع: **Settings ← Secrets and variables ← Actions**، أضف:
-   `NAZZIL_KEYSTORE_B64` (ناتج base64)، `NAZZIL_KEYSTORE_PASSWORD`، `NAZZIL_KEY_ALIAS` (مثلًا `nazzil`)، `NAZZIL_KEY_PASSWORD`.
-3. بعد أي push ستجد في **Actions** الملف `Nazzil-GooglePlay-Bundle` (ملف `.aab`) لرفعه إلى Play Console.
-4. نصوص المتجر، وإجابات «أمان البيانات»، وإعلان الخدمة في المقدّمة: [`store/LISTING.md`](store/LISTING.md). الصور جاهزة في [`store/`](store).
-5. سياسة الخصوصية: [`PRIVACY.md`](PRIVACY.md). يحتاج المتجر رابطًا عامًا لها.
+   `NAZZIL_KEYSTORE_B64`، `NAZZIL_KEYSTORE_PASSWORD`، `NAZZIL_KEY_ALIAS` (مثلًا `nazzil`)، `NAZZIL_KEY_PASSWORD`.
+3. من **Actions** حمّل `Nazzil-GooglePlay-Bundle`. فيه `NazzilOpen-play.aab` للرفع، و`NazzilOpen-test.apk` لتجربته على جوالك قبل الرفع.
+4. النصوص، وملاحظات المراجِع، وأمان البيانات، والصور: [`store/play/`](store/play).
 
 ### Microsoft Store
 1. أنشئ التطبيق في Partner Center، ثم انسخ من **Product identity**: Package/Identity Name وPublisher وPublisher display name.

@@ -212,6 +212,7 @@ object Downloads {
     fun withCookies(args: List<String>): List<String> {
         val i = args.indexOf("__COOKIES__")
         if (i < 0) return args
+        if (StorePolicy.ENABLED) return args.filterIndexed { idx, _ -> idx != i && idx != i - 1 }
         val file = exportCookies()
         return if (file != null) args.toMutableList().also { it[i] = file.absolutePath }
         else args.filterIndexed { idx, _ -> idx != i && idx != i - 1 }
@@ -231,8 +232,9 @@ object Downloads {
                     work.listFiles()?.forEach { it.delete() }
                     val args = clips.getJSONArray(i).let { a -> List(a.length()) { a.getString(it) } }
                         .map { it.replace("__PAGE__", page).replace("__WORK__", work.absolutePath) }
-                    val sep = args.indexOf("--")
-                    runCatching { YoutubeDL.getInstance().execute(YoutubeDLRequest(args.drop(sep + 1)).apply { addCommands(args.take(sep)) }) }
+                    val safe = runCatching { StorePolicy.enforce(args) }.getOrNull() ?: continue
+                    val sep = safe.indexOf("--")
+                    runCatching { YoutubeDL.getInstance().execute(YoutubeDLRequest(safe.drop(sep + 1)).apply { addCommands(safe.take(sep)) }) }
                     val clip = work.listFiles()?.firstOrNull { it.name.startsWith("clip.") } ?: continue
                     if (ffmpeg(plan.list("toJpeg").map { it.replace("__SRC__", clip.absolutePath).replace("__JPG__", jpg.absolutePath) }) && jpg.exists()) break
                 }

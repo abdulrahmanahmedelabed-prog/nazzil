@@ -128,3 +128,34 @@ test("Windows and Android report the same version", () => {
   const gradle = read("android/app/build.gradle.kts").match(/versionName = "([^"]+)"/)[1];
   assert.equal(gradle, pkg);
 });
+
+test("store edition: only sources that allow downloading", () => {
+  const allow = ["https://archive.org/details/night_of_the_living_dead", "https://commons.wikimedia.org/wiki/File:A.webm",
+    "https://framatube.org/w/kkGMgK9ZtnKfYAgnEtQxbv", "https://example.org/podcast/episode-12.mp3", "https://feeds.example.org/show.rss"];
+  const block = ["https://www.youtube.com/watch?v=1", "https://m.youtube.com/shorts/1", "https://youtu.be/1", "https://music.youtube.com/watch?v=1",
+    "https://www.youtube-nocookie.com/embed/1", "https://YOUTUBE.COM./watch?v=1", "https://www.facebook.com/x/videos/1", "https://fb.watch/x",
+    "https://www.instagram.com/reel/x", "https://www.tiktok.com/@a/video/1", "https://vm.tiktok.com/x", "https://x.com/a/status/1",
+    "https://twitter.com/a/status/1", "https://www.twitch.tv/videos/1", "https://www.dailymotion.com/video/x", "https://soundcloud.com/a/b",
+    "https://vimeo.com/1", "https://open.spotify.com/track/1", "javascript:alert(1)", "file:///etc/passwd"];
+  for (const u of allow) assert.ok(y.storeAllows(u), "should allow " + u);
+  for (const u of block) assert.ok(!y.storeAllows(u), "should block " + u);
+  // The store build pins yt-dlp to the allowed extractors and drops SponsorBlock/cookies.
+  const a = y.buildArgs({ url: allow[0], kind: "mp3", sponsor: true, cookies: "chrome" }, { outDir: "/o", store: true, cookiesFile: "/c.txt" });
+  assert.equal(a[a.indexOf("--use-extractors") + 1], y.STORE.extractors);
+  assert.ok(!a.includes("--sponsorblock-remove") && !a.includes("--cookies") && !a.includes("--cookies-from-browser"));
+  assert.ok(!y.STORE.extractors.split(",").some(e => /youtube|facebook|instagram|tiktok|twitter/i.test(e)));
+  assert.ok(y.coverArgs.clip(allow[0], 5, "/w/c.%(ext)s", "", true).includes("--use-extractors"));
+});
+
+test("store edition: Kotlin policy matches the JavaScript one exactly", () => {
+  const kt = read("android/app/src/main/java/app/nazzil/StorePolicy.kt");
+  const ktRegex = kt.match(/private val BLOCKED = Regex\("((?:[^"\\]|\\.)*)"/)[1].replace(/\\\\/g, "\\");
+  assert.equal(ktRegex, y.STORE.blocked.source);
+  assert.equal(kt.match(/const val EXTRACTORS = "([^"]+)"/)[1], y.STORE.extractors);
+});
+
+test("store edition: its platforms are all allowed and none of the full edition's are", () => {
+  const { STORE_SITES } = require("../web/sites.js");
+  for (const s of STORE_SITES) assert.ok(y.storeAllows(s.url), s.id);
+  for (const s of SITES) assert.ok(!y.storeAllows(s.url), s.id + " must not be reachable in the store edition");
+});

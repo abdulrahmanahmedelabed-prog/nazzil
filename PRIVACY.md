@@ -17,6 +17,9 @@ _آخر تحديث: 21 أكتوبر 2026_
 - خوادم تحديث محرك التنزيل (yt-dlp) على GitHub.
 - SponsorBlock (sponsor.ajay.app) فقط إذا فعّلت خيار حذف الإعلانات المدمجة، ويُرسل إليه معرّف الفيديو فقط.
 
+## نسخة Google Play («نزّل مفتوح»)
+تنزّل من مصادر تسمح بالتنزيل فقط، ولا تتصل بـ SponsorBlock، ولا تستخدم تسجيل الدخول، ولا تحدّث محرك التنزيل من الإنترنت (تتحدّث عبر Google Play فقط).
+
 ## الوصول من الجوال (Windows)
 عند تفعيله يفتح نزّل منفذًا على شبكتك المحلية فقط، محميًا بمفتاح سري. لا يمكن الوصول إليه من الإنترنت.
 
@@ -43,6 +46,7 @@ _Last updated: October 21, 2026_
 - **Downloaded files, history and settings** stay on your device; you can clear them in the app.
 - **Sign-ins made in Nazzil's built-in browser:** their cookies stay on your device and are used only when downloading from those same sites. You can turn this off in Settings.
 - **Network connections:** the sites you download from (at your request); GitHub, to check for a newer version and to update the download engine (no personal data sent); SponsorBlock, only if you enable sponsor removal (only the video ID is sent).
+- **Google Play edition (Nazzil Open):** downloads only from sources that allow it; never contacts SponsorBlock, never uses sign-ins, and never updates its download engine from the internet (updates come only through Google Play).
 - **Phone access (Windows):** when enabled, Nazzil listens on your local network only, protected by a secret key; it is not reachable from the internet.
 - **Android permissions:** Internet (downloading), notifications (progress and completion), foreground service of type data sync (finishing downloads after you leave the app).
 - **Children:** not directed at children under 13; no data is collected from anyone.

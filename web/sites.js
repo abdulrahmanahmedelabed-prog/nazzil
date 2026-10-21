@@ -25,7 +25,16 @@
     { id: "reddit", name: "Reddit", url: "https://www.reddit.com/", color: "#ff4500", icon: "●",
       match: "reddit\\.com/r/[^/]+/comments/" },
   ];
-  const api = { SITES, byId: id => SITES.find(s => s.id === id) };
+  // Store edition (Google Play): only sources whose licenses or terms allow downloading.
+  const STORE_SITES = [
+    { id: "archive", name: "Internet Archive", url: "https://archive.org/search?query=mediatype%3Amovies", color: "#4b5563", icon: "🏛",
+      match: "archive\\.org/details/[^/?#]+" },
+    { id: "commons", name: "Wikimedia Commons", url: "https://commons.wikimedia.org/wiki/Category:Videos", color: "#0b6e99", icon: "W",
+      match: "commons\\.wikimedia\\.org/wiki/File:" },
+    { id: "peertube", name: "PeerTube", url: "https://sepiasearch.org/", color: "#f1680d", icon: "▷",
+      match: "/(w|videos/watch)/[\\w-]{8,}" },
+  ];
+  const api = { SITES, STORE_SITES, byId: id => SITES.concat(STORE_SITES).find(s => s.id === id) };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.NzSites = api;
 })(typeof self !== "undefined" ? self : this);

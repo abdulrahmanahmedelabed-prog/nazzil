@@ -46,7 +46,7 @@
   <header class="topbar">
     <div class="brand">
       <img src="icon.svg" alt="" width="34" height="34">
-      <div><strong>نزّل</strong><span id="tools" class="tools">فحص الأدوات…</span></div>
+      <div><strong id="brandName">نزّل</strong><span id="tools" class="tools">فحص الأدوات…</span></div>
     </div>
     <div class="top-actions">
       <button id="langBtn" class="icon-btn lang-btn" aria-label="اللغة" title="اللغة" data-no-i18n>EN</button>
@@ -162,7 +162,7 @@
         <label class="switch"><span><svg><use href="#i-layers"/></svg>تنزيل قائمة التشغيل كاملة</span><input type="checkbox" id="playlist" role="switch"></label>
         <label class="switch"><span><svg><use href="#i-tag"/></svg>تضمين البيانات (العنوان، الفنان، الفصول)</span><input type="checkbox" id="meta" role="switch" checked></label>
         <label class="switch" id="subsRow"><span><svg><use href="#i-cc"/></svg>تضمين الترجمة (عربي / إنجليزي)</span><input type="checkbox" id="subs" role="switch"></label>
-        <label class="switch"><span><svg><use href="#i-zap"/></svg>حذف الإعلانات المدمجة والمقدمات (SponsorBlock)</span><input type="checkbox" id="sponsor" role="switch"></label>
+        <label class="switch" id="sponsorRow"><span><svg><use href="#i-zap"/></svg>حذف الإعلانات المدمجة والمقدمات (SponsorBlock)</span><input type="checkbox" id="sponsor" role="switch"></label>
       </section>
 
       <p class="x-note">تُطبَّق الإضافات على التنزيل التالي وتُحفظ لمرّات قادمة.</p>
@@ -172,6 +172,21 @@
   <div class="scrim" id="scrim" hidden></div>
   <div class="drop-overlay" id="dropOverlay" hidden><div><svg><use href="#i-dl"/></svg><b>أفلت الرابط هنا</b></div></div>
   <div class="toasts" id="toasts" aria-live="assertive"></div>
+
+  <dialog id="storeNotice" class="dialog">
+    <form method="dialog">
+      <div class="dlg-head"><h3>نزّل — مصادر مفتوحة</h3></div>
+      <p class="notice-text">هذه النسخة تنزّل من مصادر تسمح بالتنزيل فقط:</p>
+      <ul class="notice-list">
+        <li>Internet Archive — أفلام وصوتيات في الملكية العامة</li>
+        <li>Wikimedia Commons — وسائط بتراخيص حرّة</li>
+        <li>PeerTube — منصات فيديو مفتوحة</li>
+        <li>البودكاست والروابط المباشرة لملفات الصوت والفيديو</li>
+      </ul>
+      <p class="notice-text">نزّل فقط ما تملكه أو ما يسمح ترخيصه بتنزيله.</p>
+      <button class="btn primary" value="ok" style="width:100%">فهمت</button>
+    </form>
+  </dialog>
 
   <dialog id="settings" class="dialog">
     <form method="dialog">

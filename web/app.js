@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 const t = NzI18n.t;
 const HISTORY = "nazil.history.v1", PREFS = "nazil.prefs.v2";
+let status = {}; // filled by loadStatus(): platform, versions, store edition…
 
 /* ---------- Platform bridge ----------
    One async RPC for every platform:
@@ -24,13 +25,13 @@ function rpc(method, args = {}) {
       const url = NzYtdlp.validUrl(args.url);
       if (!url) return Promise.reject(new Error("الرابط غير صالح. استخدم رابطًا يبدأ بـ https://"));
       // "__COOKIES__" is replaced natively with the in-app browser's sign-ins (or dropped if there are none).
-      args = { ...args, url, args: NzYtdlp.buildArgs({ ...args, url }, { outDir: "__OUT__", cookiesFile: "__COOKIES__" }) };
+      args = { ...args, url, args: NzYtdlp.buildArgs({ ...args, url }, { outDir: "__OUT__", cookiesFile: "__COOKIES__", store: isStore() }) };
       // Cover from a video frame or the user's image: native code runs these steps after the download.
       if (NzYtdlp.needsCover(args)) {
         const c = NzYtdlp.coverArgs, sec = NzYtdlp.toSeconds(args.coverAt) || 30;
         args.coverPlan = {
           mode: NzYtdlp.coverMode(args), image: args.coverImage || "",
-          clips: [sec, 1].map(x => c.clip("__PAGE__", x, "__WORK__/clip.%(ext)s")),
+          clips: [sec, 1].map(x => c.clip("__PAGE__", x, "__WORK__/clip.%(ext)s", "", isStore())),
           toJpeg: c.toJpeg("__SRC__", "__JPG__"),
           embed: c.embed("__AUDIO__." + args.kind, "__JPG__", "__OUT__"),
         };
@@ -148,7 +149,7 @@ function activeExtras() {
   if (from || to) out.push(["scissors", `\u2066${from || "0:00"}–${to || "…"}\u2069`]); // LTR isolate so times don't flip in Arabic
   if (audio && prefs.cover !== "thumb") out.push(["image", t({ frame: "لقطة من الفيديو", custom: "صورة من جهازي", none: "بدون صورة" }[prefs.cover])]);
   if (!audio && prefs.subs) out.push(["cc", t("ترجمة")]);
-  if (prefs.sponsor) out.push(["zap", "SponsorBlock"]);
+  if (prefs.sponsor && !isStore()) out.push(["zap", "SponsorBlock"]);
   if (!prefs.meta) out.push(["tag", t("بلا بيانات")]);
   return out;
 }
@@ -201,6 +202,13 @@ function queueInfo() {
   }
   if (!looksLikeUrl(url)) { $("preview").hidden = true; lastInfo = null; infoFor = ""; return; }
   if (url === infoFor) return;
+  if (!allowedHere(url)) {
+    infoFor = url; lastInfo = null;
+    const box = $("preview");
+    box.hidden = false; box.className = "preview loading";
+    box.innerHTML = `<span class="err">${esc(t(STORE_ONLY))}</span>`;
+    return;
+  }
   infoTimer = setTimeout(() => loadInfo(url), 450);
 }
 async function loadInfo(url) {
@@ -313,6 +321,7 @@ $("form").addEventListener("submit", async e => {
   const urls = extractUrls($("url").value);
   const url = urls[0] || $("url").value.trim();
   if (!looksLikeUrl(url)) { toast("ألصق رابطًا صحيحًا يبدأ بـ https://", true); $("url").focus(); return; }
+  if (!urls.concat(url).every(allowedHere)) { toast(STORE_ONLY, true); return; }
   savePrefs();
   if (isAudio(prefs.kind) && prefs.cover === "custom" && !prefs.coverImage) { toast("اختر صورة الغلاف أولًا.", true); setExtras(true); return; }
   $("submit").disabled = true;
@@ -372,7 +381,10 @@ document.addEventListener("paste", e => {
 });
 
 // Browse: the in-app browser shows a "Download with Nazzil" button on the platform's video pages.
-$("siteGrid").innerHTML = NzSites.SITES.map(x => `<button type="button" class="site" data-site="${x.id}" style="background:${x.color}" title="${esc(x.name)}" aria-label="${esc(x.name)}">${x.icon}</button>`).join("");
+function renderSites() {
+  const list = isStore() ? NzSites.STORE_SITES : NzSites.SITES;
+  $("siteGrid").innerHTML = list.map(x => `<button type="button" class="site" data-site="${x.id}" style="background:${x.color}" title="${esc(x.name)}" aria-label="${esc(x.name)}">${x.icon}</button>`).join("");
+}
 $("siteGrid").addEventListener("click", e => {
   const b = e.target.closest("[data-site]");
   if (!b) return;
@@ -445,7 +457,6 @@ document.addEventListener("keydown", e => {
 });
 
 /* ---------- Settings ---------- */
-let status = {};
 $("settingsBtn").addEventListener("click", () => $("settings").showModal());
 $("pickFolder").addEventListener("click", async () => {
   try { const r = await rpc("pickFolder"); if (r.folder) $("folderPath").textContent = r.folder; } catch (e) { toast(e.message, true); }
@@ -475,6 +486,7 @@ async function loadStatus() {
       // In a phone browser (LAN mode) hide the controls that act on the computer itself.
       for (const id of ["folderRow", "loginRow", "engineRow", "openFolderTop"]) $(id).hidden = isWeb();
       $("lanRow").hidden = status.platform !== "windows";
+      if (isStore()) applyStoreEdition();
       if (status.platform === "windows") refreshLan();
       rpc("settings", { parallel: +prefs.parallel }).catch(() => {});
       checkForUpdate(status.appVersion);
@@ -482,6 +494,28 @@ async function loadStatus() {
     } catch { await new Promise(r => setTimeout(r, 700)); }
   }
   $("tools").textContent = t("الخدمة غير متصلة");
+}
+
+/* ---------- Store edition (Google Play: "Nazzil Open") ---------- */
+const STORE_ONLY = "هذه النسخة تنزّل من المصادر المفتوحة فقط: Internet Archive وWikimedia Commons وPeerTube والبودكاست والروابط المباشرة.";
+const isStore = () => !!status.store;
+const allowedHere = u => !isStore() || NzYtdlp.storeAllows(u);
+function applyStoreEdition() {
+  renderSites();
+  const brand = $("brandName");
+  brand.textContent = t("نزّل مفتوح");
+  brand.setAttribute("data-no-i18n", ""); // keep the edition name when the language changes (set again in applyLang)
+  // Options that only make sense for platforms this edition doesn't support.
+  for (const id of ["sponsorRow", "cookiesRow", "loginRow", "engineRow"]) $(id).hidden = true;
+  $("sponsor").checked = false;
+  const input = $("url");
+  input.dataset.i18nPlaceholder = "الصق رابطًا من مصدر مفتوح أو رابط ملف مباشر…";
+  input.placeholder = t(input.dataset.i18nPlaceholder);
+  // One-time explanation of what this edition downloads.
+  if (!store.get("nazil.storeNotice", false)) {
+    $("storeNotice").showModal();
+    $("storeNotice").addEventListener("close", () => store.set("nazil.storeNotice", true), { once: true });
+  }
 }
 
 /* ---------- Phone access (LAN) ---------- */
@@ -547,12 +581,17 @@ window.nazzilBack = () => {
 };
 
 // Android (share sheet / in-app browser) hands us a URL.
-window.nazzilSetUrl = url => { $("url").value = extractUrls(url).join(" ") || url; queueInfo(); toast("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."); };
+window.nazzilSetUrl = url => {
+  $("url").value = extractUrls(url).join(" ") || url;
+  queueInfo();
+  if (extractUrls(url).every(allowedHere)) toast("تم استلام الرابط. اختر الصيغة وأضفه للتنزيل."); else toast(STORE_ONLY, true);
+};
 
 const platformText = () => status.platform === "android" ? "يعمل محليًا على Android" : status.platform === "web" ? "يعمل عبر كمبيوترك" : "يعمل محليًا على Windows";
 function applyLang() {
   NzI18n.translatePage();
   $("langBtn").textContent = NzI18n.lang === "en" ? "ع" : "EN";
+  if (isStore()) $("brandName").textContent = t("نزّل مفتوح");
   if (status.platform && status.yt_dlp && status.ffmpeg) $("tools").textContent = t(platformText());
   renderSummary();
   renderHistory();
@@ -560,6 +599,7 @@ function applyLang() {
 }
 $("langBtn").addEventListener("click", () => { NzI18n.set(NzI18n.lang === "en" ? "ar" : "en"); applyLang(); });
 
+renderSites();
 applyPrefs();
 applyLang();
 loadStatus().then(() => { if (prefs.autoClip) pasteFromClipboard(true); });

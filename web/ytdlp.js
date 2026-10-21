@@ -21,7 +21,7 @@
     } catch { return null; }
   }
 
-  /** opts: {url, kind, quality, abr, playlist, meta, subs, sponsor, from, to, rate, cookies}; env: {outDir, ffmpeg?, tempDir?, cookiesFile?, jsRuntime?} */
+  /** opts: {url, kind, quality, abr, playlist, meta, subs, sponsor, from, to, rate, cookies}; env: {outDir, ffmpeg?, tempDir?, cookiesFile?, jsRuntime?, store?} */
   function buildArgs(opts, env) {
     const kind = ["mp3", "m4a", "mp4", "webm"].includes(opts.kind) ? opts.kind : "mp3";
     const q = HEIGHTS.includes(String(opts.quality)) ? String(opts.quality) : "1080";
@@ -33,7 +33,8 @@
       "--retries", "10", "--fragment-retries", "10", "--concurrent-fragments", "4",
       "-P", env.outDir];
     if (env.ffmpeg) a.push("--ffmpeg-location", env.ffmpeg);
-    if (env.jsRuntime) a.push("--js-runtimes", env.jsRuntime); // e.g. "deno:C:\\…\\deno.exe" (YouTube needs a JS runtime)
+    if (env.jsRuntime) a.push("--js-runtimes", env.jsRuntime);
+    if (env.store) a.push("--use-extractors", STORE.extractors); // e.g. "deno:C:\\…\\deno.exe" (YouTube needs a JS runtime)
     // Per-job temp dir so parallel jobs for the same video don't clobber each other's intermediates.
     if (env.tempDir) a.push("-P", "temp:" + env.tempDir);
 
@@ -57,12 +58,12 @@
     const thumb = audio ? cover === "thumb" : opts.meta && kind !== "webm";
     if (thumb) a.push("--embed-thumbnail", "--convert-thumbnails", "jpg");
     if (opts.subs && !audio) a.push("--write-subs", "--write-auto-subs", "--sub-langs", "ar.*,en.*,-live_chat", "--embed-subs");
-    if (opts.sponsor) a.push("--sponsorblock-remove", "sponsor,selfpromo,interaction");
+    if (opts.sponsor && !env.store) a.push("--sponsorblock-remove", "sponsor,selfpromo,interaction");
     if (RATES.includes(opts.rate)) a.push("-r", opts.rate);
     // Age-restricted / members-only content: reuse the user's own browser session.
-    if (BROWSERS.includes(opts.cookies)) a.push("--cookies-from-browser", opts.cookies);
+    if (BROWSERS.includes(opts.cookies) && !env.store) a.push("--cookies-from-browser", opts.cookies);
     // Otherwise reuse the sign-ins made in Nazzil's own browser (exported by the platform as cookies.txt).
-    else if (env.cookiesFile && opts.useLogin !== false) a.push("--cookies", env.cookiesFile);
+    else if (env.cookiesFile && opts.useLogin !== false && !env.store) a.push("--cookies", env.cookiesFile);
 
     const from = TIME.test(opts.from || "") ? opts.from : "", to = TIME.test(opts.to || "") ? opts.to : "";
     if (from || to) a.push("--download-sections", `*${from || "0"}-${to || "inf"}`, "--force-keyframes-at-cuts");
@@ -90,10 +91,11 @@
   /** Arguments for each cover step; file paths are filled in by the platform. */
   const coverArgs = {
     // yt-dlp: fetch ~2 seconds of video around the chosen time (works for any site yt-dlp supports).
-    clip: (pageUrl, seconds, outTemplate, cookies) => {
+    clip: (pageUrl, seconds, outTemplate, cookies, store) => {
       const a = ["--no-playlist", "--no-warnings", "--quiet", "-f", "bv*[height<=720]/bv*/b",
         "--download-sections", `*${seconds}-${seconds + 2}`, "-o", outTemplate];
       if (BROWSERS.includes(cookies)) a.push("--cookies-from-browser", cookies);
+      if (store) a.push("--use-extractors", STORE.extractors);
       a.push("--", pageUrl);
       return a;
     },
@@ -130,6 +132,24 @@
     return lines.join("\n") + "\n";
   }
 
+  /* ---------- Store edition ("Nazzil Open", Google Play) ----------
+     Only sources whose terms or licenses permit downloading. Enforced in three layers:
+     1) storeAllows() before anything is fetched (page + native code),
+     2) yt-dlp only gets these extractors (--use-extractors), so links embedded in other pages can't escape,
+     3) the store build never updates yt-dlp at runtime (Play forbids downloading executable code). */
+  const STORE = {
+    extractors: "archive.org,wikimedia.org,PeerTube,PeerTube:Playlist,generic",
+    // Never contacted in the store edition, even through the generic extractor.
+    blocked: /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|youtubekids\.com|googlevideo\.com|ytimg\.com|facebook\.com|fb\.watch|fbcdn\.net|instagram\.com|cdninstagram\.com|tiktok\.com|tiktokcdn\.com|twitter\.com|x\.com|twimg\.com|twitch\.tv|dailymotion\.com|dai\.ly|reddit\.com|redd\.it|soundcloud\.com|vimeo\.com|spotify\.com|netflix\.com|disneyplus\.com|primevideo\.com|amazon\.[a-z.]+|apple\.com|deezer\.com|anghami\.com|shahid\.net|osn\.com)$/i,
+  };
+  /** Store edition: is this link from a source that may be downloaded? */
+  function storeAllows(raw) {
+    try {
+      const u = new URL(String(raw).trim());
+      return (u.protocol === "https:" || u.protocol === "http:") && !STORE.blocked.test(u.hostname.replace(/\.$/, ""));
+    } catch { return false; }
+  }
+
   const clean = s => { s = String(s || "").trim(); return s === "NA" || s === "None" || s === "Unknown" ? "" : s; };
   const ETA_AR = s => s && !/unknown/i.test(s) ? s.replace(/^00:/, "") : "";
 
@@ -159,5 +179,5 @@
       thumbnail: j.thumbnail || "", height: Math.max(0, j.height || 0, ...heights) || 0, site };
   }
 
-  return { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds, cookieJar };
+  return { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds, cookieJar, storeAllows, STORE };
 });

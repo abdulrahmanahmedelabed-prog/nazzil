@@ -32,19 +32,22 @@ class Bridge(private val activity: MainActivity) {
             JSONObject().put("yt_dlp", Tools.ytdlp).put("ffmpeg", Tools.ffmpeg)
                 .put("version", runCatching { YoutubeDL.getInstance().version(activity) }.getOrNull() ?: "")
                 .put("folder", "Download/Nazzil").put("canPickFolder", false).put("platform", "android")
+                .put("store", StorePolicy.ENABLED)
                 .put("appVersion", runCatching { activity.packageManager.getPackageInfo(activity.packageName, 0).versionName }.getOrNull() ?: "")
         }
         "info" -> {
             waitReady()
+            if (StorePolicy.ENABLED && !StorePolicy.allows(a.getString("url"))) throw Exception(StorePolicy.MESSAGE)
             val r = YoutubeDLRequest(a.getString("url")).apply {
                 addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings"); addOption("--playlist-end", "500")
-                Downloads.exportCookies()?.let { addOption("--cookies", it.absolutePath) }
+                if (StorePolicy.ENABLED) addOption("--use-extractors", StorePolicy.EXTRACTORS)
+                if (!StorePolicy.ENABLED) Downloads.exportCookies()?.let { addOption("--cookies", it.absolutePath) }
             }
             val res = runCatching { YoutubeDL.getInstance().execute(r) }.getOrElse { throw Exception(Downloads.friendly(it.message)) }
             JSONObject().put("__raw", res.out)
         }
         "download" -> {
-            val args = a.getJSONArray("args").let { arr -> List(arr.length()) { arr.getString(it) } }
+            val args = StorePolicy.enforce(a.getJSONArray("args").let { arr -> List(arr.length()) { arr.getString(it) } })
             activity.ensureNotificationPermission()
             JSONObject().put("jobId", Downloads.add(a.optString("kind", "mp3"), a.optString("title"), args, a.optJSONObject("coverPlan")))
         }
@@ -68,6 +71,8 @@ class Bridge(private val activity: MainActivity) {
         "pickFolder" -> JSONObject().put("folder", "Download/Nazzil")
         "pickImage" -> activity.pickImage()?.let { (path, name) -> JSONObject().put("path", path).put("name", name) } ?: JSONObject()
         "update" -> {
+            // Google Play forbids apps from downloading executable code; the store edition updates through Play.
+            if (StorePolicy.ENABLED) throw Exception("تُحدَّث هذه النسخة عبر Google Play.")
             waitReady()
             YoutubeDL.getInstance().updateYoutubeDL(activity, YoutubeDL.UpdateChannel._STABLE)
             JSONObject().put("version", YoutubeDL.getInstance().version(activity) ?: "")
