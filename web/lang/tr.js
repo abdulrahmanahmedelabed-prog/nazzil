@@ -198,5 +198,7 @@ NzI18n.add("tr", {
   "بنفسجي": "Mor",
   "وردي": "Pembe",
   "ذهبي": "Kehribar",
-  "فيروزي": "Turkuaz"
+  "فيروزي": "Turkuaz",
+  "المزيد": "Daha fazla",
+  "منصات أخرى": "Diğer platformlar"
 });

@@ -402,13 +402,28 @@ document.addEventListener("paste", e => {
 });
 
 // Browse: the in-app browser shows a "Download with Nazzil" button on the platform's video pages.
+// The most used platforms sit on the main screen; the rest live under Add-ons ("More" jumps there).
+const siteTile = x => `<button type="button" class="site" data-site="${x.id}" title="${esc(x.name)}"><span class="site-ic" style="background:${x.color}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${x.icon}"/></svg></span><span>${esc(x.name)}</span></button>`;
 function renderSites() {
   const list = isStore() ? NzSites.STORE_SITES : NzSites.SITES;
-  $("siteGrid").innerHTML = list.map(x => `<button type="button" class="site" data-site="${x.id}" style="background:${x.color}" title="${esc(x.name)}" aria-label="${esc(x.name)}">${x.icon}</button>`).join("");
+  const top = list.filter(x => x.top), more = list.filter(x => !x.top);
+  $("siteGrid").style.setProperty("--n", top.length + (more.length ? 1 : 0));
+  $("siteGrid").innerHTML = top.map(siteTile).join("")
+    + (more.length ? `<button type="button" class="site more" data-more><span class="site-ic">${icon("more")}</span><span>${esc(t("المزيد"))}</span></button>` : "");
+  $("moreGrid").innerHTML = more.map(siteTile).join("");
+  $("moreSites").hidden = !more.length;
 }
-$("siteGrid").addEventListener("click", e => {
+function showMoreSites() {
+  if (matchMedia("(max-width:980px)").matches) setExtras(true); // drawer on small screens; the side panel is always shown on wide ones
+  const sec = $("moreSites");
+  sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  sec.classList.remove("flash"); void sec.offsetWidth; sec.classList.add("flash");
+}
+function onSiteClick(e) {
+  if (e.target.closest("[data-more]")) return showMoreSites();
   const b = e.target.closest("[data-site]");
   if (!b) return;
+  if (document.body.classList.contains("extras-open")) setExtras(false);
   const site = NzSites.byId(b.dataset.site);
   if (isWeb()) {
     // In a phone browser there's no in-app browser: open the site in a new tab and paste the link back.
@@ -418,7 +433,9 @@ $("siteGrid").addEventListener("click", e => {
   }
   rpc("browse", { site: site.id, name: site.name, url: site.url, mobileUrl: site.mobileUrl || "", match: site.match })
     .catch(err => toast(err.message, true));
-});
+}
+$("siteGrid").addEventListener("click", onSiteClick);
+$("moreGrid").addEventListener("click", onSiteClick);
 $("clearUrl").addEventListener("click", () => { $("url").value = ""; queueInfo(); $("url").focus(); });
 $("pasteBtn").addEventListener("click", () => pasteFromClipboard(false));
 $("clearHistory").addEventListener("click", () => { store.set(HISTORY, []); $("historySearch").value = ""; renderHistory(); });
@@ -753,6 +770,7 @@ function applyLang() {
   $("submit").querySelector("span").textContent = t(localFile ? "تحويل" : "تنزيل");
   if (isStore()) $("brandName").textContent = t("نزّل مفتوح");
   if (status.platform && status.yt_dlp && status.ffmpeg) $("tools").textContent = t(platformText());
+  renderSites();
   renderSummary();
   renderHistory();
   renderSupport();

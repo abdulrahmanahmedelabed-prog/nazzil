@@ -198,5 +198,7 @@ NzI18n.add("de", {
   "بنفسجي": "Violett",
   "وردي": "Rosa",
   "ذهبي": "Bernstein",
-  "فيروزي": "Türkis"
+  "فيروزي": "Türkis",
+  "المزيد": "Mehr",
+  "منصات أخرى": "Weitere Plattformen"
 });

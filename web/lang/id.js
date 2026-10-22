@@ -198,5 +198,7 @@ NzI18n.add("id", {
   "بنفسجي": "Ungu",
   "وردي": "Merah muda",
   "ذهبي": "Kuning",
-  "فيروزي": "Toska"
+  "فيروزي": "Toska",
+  "المزيد": "Lainnya",
+  "منصات أخرى": "Platform lainnya"
 });
