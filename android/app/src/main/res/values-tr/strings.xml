@@ -4,6 +4,7 @@
     <string name="channel_finished">Tamamlanan indirmeler</string>
     <string name="download_done">İndirme tamamlandı</string>
     <string name="download_failed">İndirme başarısız</string>
+    <string name="waiting_network">Nazzil · internet bekleniyor</string>
     <plurals name="downloads_running">
         <item quantity="one">Nazzil · %d indirme sürüyor</item>
         <item quantity="other">Nazzil · %d indirme sürüyor</item>

@@ -51,7 +51,9 @@ class DownloadService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle(Lang.ctx(this).resources.getQuantityString(R.plurals.downloads_running, active, active))
+            .setContentTitle(Lang.ctx(this).resources.run {
+                if (Downloads.waitingForNetwork()) getString(R.string.waiting_network) else getQuantityString(R.plurals.downloads_running, active, active)
+            })
             .setContentText("$progress%")
             .setProgress(100, progress, progress == 0)
             .setOngoing(true)

@@ -4,6 +4,7 @@
     <string name="channel_finished">完了したダウンロード</string>
     <string name="download_done">ダウンロード完了</string>
     <string name="download_failed">ダウンロード失敗</string>
+    <string name="waiting_network">Nazzil · インターネット待ち</string>
     <plurals name="downloads_running">
         <item quantity="other">Nazzil · %d 件ダウンロード中</item>
     </plurals>

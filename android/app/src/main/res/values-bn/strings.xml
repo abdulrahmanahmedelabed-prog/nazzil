@@ -4,6 +4,7 @@
     <string name="channel_finished">সম্পন্ন ডাউনলোড</string>
     <string name="download_done">ডাউনলোড সম্পন্ন</string>
     <string name="download_failed">ডাউনলোড ব্যর্থ</string>
+    <string name="waiting_network">Nazzil · ইন্টারনেটের অপেক্ষায়</string>
     <plurals name="downloads_running">
         <item quantity="one">Nazzil · %dটি ডাউনলোড চলছে</item>
         <item quantity="other">Nazzil · %dটি ডাউনলোড চলছে</item>

@@ -200,5 +200,7 @@ NzI18n.add("de", {
   "ذهبي": "Bernstein",
   "فيروزي": "Türkis",
   "المزيد": "Mehr",
-  "منصات أخرى": "Weitere Plattformen"
+  "منصات أخرى": "Weitere Plattformen",
+  "بانتظار الإنترنت… سيبدأ تلقائيًا": "Warte auf Internet… startet automatisch",
+  "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.": "Kein Internet. Zur Warteschlange hinzugefügt; startet, sobald du wieder online bist."
 });

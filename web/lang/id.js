@@ -200,5 +200,7 @@ NzI18n.add("id", {
   "ذهبي": "Kuning",
   "فيروزي": "Toska",
   "المزيد": "Lainnya",
-  "منصات أخرى": "Platform lainnya"
+  "منصات أخرى": "Platform lainnya",
+  "بانتظار الإنترنت… سيبدأ تلقائيًا": "Menunggu internet… mulai otomatis",
+  "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.": "Tidak ada internet. Ditambahkan ke antrean; mulai saat koneksi kembali."
 });

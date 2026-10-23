@@ -200,5 +200,7 @@ NzI18n.add("en", {
   "ذهبي": "Amber",
   "فيروزي": "Teal",
   "المزيد": "More",
-  "منصات أخرى": "More platforms"
+  "منصات أخرى": "More platforms",
+  "بانتظار الإنترنت… سيبدأ تلقائيًا": "Waiting for internet… starts automatically",
+  "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.": "No internet. Added to the queue; it starts when you're back online."
 });

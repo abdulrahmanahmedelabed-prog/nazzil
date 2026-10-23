@@ -1,0 +1,1 @@
+Violet is Nazzil's new color. Offline queue: links added without internet wait in the queue and start by themselves when the connection is back; a download cut off mid-way resumes where it stopped.

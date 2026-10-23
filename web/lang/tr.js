@@ -200,5 +200,7 @@ NzI18n.add("tr", {
   "ذهبي": "Kehribar",
   "فيروزي": "Turkuaz",
   "المزيد": "Daha fazla",
-  "منصات أخرى": "Diğer platformlar"
+  "منصات أخرى": "Diğer platformlar",
+  "بانتظار الإنترنت… سيبدأ تلقائيًا": "İnternet bekleniyor… kendiliğinden başlayacak",
+  "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.": "İnternet yok. Kuyruğa eklendi; bağlantı gelince başlayacak."
 });

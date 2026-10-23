@@ -5,6 +5,7 @@
     <string name="channel_finished">اكتمال التنزيل</string>
     <string name="download_done">اكتمل التنزيل</string>
     <string name="download_failed">فشل التنزيل</string>
+    <string name="waiting_network">نزّل · بانتظار الإنترنت</string>
     <plurals name="downloads_running">
         <item quantity="zero">نزّل · لا تنزيلات جارية</item>
         <item quantity="one">نزّل · تنزيل واحد جارٍ</item>

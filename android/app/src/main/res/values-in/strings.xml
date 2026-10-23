@@ -4,6 +4,7 @@
     <string name="channel_finished">Unduhan selesai</string>
     <string name="download_done">Unduhan selesai</string>
     <string name="download_failed">Unduhan gagal</string>
+    <string name="waiting_network">Nazzil · menunggu internet</string>
     <plurals name="downloads_running">
         <item quantity="other">Nazzil · %d unduhan berjalan</item>
     </plurals>

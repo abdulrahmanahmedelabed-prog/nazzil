@@ -4,6 +4,7 @@
     <string name="channel_finished">Lượt tải đã xong</string>
     <string name="download_done">Đã tải xong</string>
     <string name="download_failed">Tải xuống thất bại</string>
+    <string name="waiting_network">Nazzil · đang chờ internet</string>
     <plurals name="downloads_running">
         <item quantity="other">Nazzil · %d lượt tải đang chạy</item>
     </plurals>

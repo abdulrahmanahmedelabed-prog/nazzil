@@ -1,5 +1,5 @@
 // Local-only RPC server (127.0.0.1) that drives yt-dlp without a shell.
-const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto"), os = require("os");
+const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto"), os = require("os"), net = require("net");
 const { spawn, execFile, execFileSync } = require("child_process");
 const { buildArgs, parseLine, summarizeInfo, validUrl, needsCover, coverMode, coverArgs, toSeconds, convertArgs, frameArgs, ffDuration, ffTime, baseTitle, LOCAL_KINDS } = require("./web/ytdlp.js");
 
@@ -12,6 +12,23 @@ function run(cmd, args, { timeout = 60000 } = {}) {
       resolve({ ok: !err, stdout: String(stdout || ""), stderr: String(stderr || ""), err }));
   });
 }
+const NET_ERR = "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.";
+/** True if any of these hosts accepts a TCP connection on 443 (the job's own site first, so a firewall that blocks public DNS IPs doesn't count as offline). */
+function online(hosts = []) {
+  const targets = [...new Set([...hosts.filter(Boolean), "1.1.1.1", "8.8.8.8"])];
+  return new Promise(resolve => {
+    let left = targets.length, done = false;
+    const finish = ok => { if (!done && (ok || --left === 0)) { done = true; resolve(ok); } };
+    for (const host of targets) {
+      const sock = net.connect({ host, port: 443, timeout: 4000 });
+      sock.once("connect", () => { sock.destroy(); finish(true); });
+      sock.once("timeout", () => { sock.destroy(); finish(false); });
+      sock.once("error", () => finish(false));
+    }
+  });
+}
+const hostOf = u => { try { return new URL(u).hostname; } catch { return ""; } };
+
 function lastError(text) {
   const line = String(text).split(/\r?\n/).reverse().find(l => /ERROR/.test(l)) || "";
   const msg = line.replace(/^.*?ERROR:\s*(\[[^\]]+\]\s*)?([\w-]+:\s*)?/, "").trim();
@@ -19,12 +36,12 @@ function lastError(text) {
   if (/Private video|Sign in|login/i.test(line)) return "المحتوى خاص أو يتطلب تسجيل الدخول.";
   if (/not available|unavailable|removed/i.test(line)) return "المقطع غير متاح.";
   if (/HTTP Error 404|Not Found/i.test(line)) return "الرابط غير موجود. تأكد منه وحاول مجددًا.";
-  if (/Unable to download webpage|Failed to resolve|timed out|Connection/i.test(line)) return "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.";
+  if (/Unable to download webpage|Failed to resolve|timed out|Connection|getaddrinfo|unreachable|name resolution|No address associated|Name or service not known/i.test(line)) return "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة.";
   if (/HTTP Error 403|Forbidden/i.test(line)) return "رفض الموقع الطلب. جرّب تحديث محرك التنزيل من الإعدادات.";
   return msg || "تعذر إكمال العملية.";
 }
 
-function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, setLang = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, pickMedia = async () => null, cookiesFile = "" }) {
+function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder, notify = () => {}, setLang = () => {}, appVersion = "", browse = () => {}, pickImage = async () => null, pickMedia = async () => null, cookiesFile = "", isOnline = online, netEvery = 8000 }) {
   webDir = path.resolve(webDir);
   fs.mkdirSync(dataDir, { recursive: true });
   const settingsFile = path.join(dataDir, "settings.json");
@@ -59,7 +76,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     if (shuttingDown) return; // stopAll already wrote the final queue
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      const keep = [...jobs.values()].filter(j => ["queued", "working", "paused"].includes(j.state))
+      const keep = [...jobs.values()].filter(j => ["queued", "working", "paused", "offline"].includes(j.state))
         .map(({ id, opts, title, state, progress, files }) => ({ id, opts, title, state, progress, files }));
       fs.writeFile(queueFile, JSON.stringify(keep), () => {});
     }, 300);
@@ -92,6 +109,18 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     const next = [...jobs.values()].filter(j => j.state === "queued");
     for (let i = 0; i < Math.min(parallel - working, next.length); i++) start(next[i]);
   }
+  // Offline queue: jobs that hit a dead connection wait as "offline" and restart on their own when it's back.
+  let netTimer = null;
+  function watchNetwork() {
+    if (netTimer) return;
+    netTimer = setInterval(async () => {
+      const waiting = [...jobs.values()].filter(j => j.state === "offline");
+      if (!waiting.length) { clearInterval(netTimer); netTimer = null; return; }
+      if (!(await isOnline(waiting.map(j => hostOf(j.opts.url))))) return;
+      for (const j of waiting) if (j.state === "offline") j.state = "queued";
+      pump();
+    }, netEvery);
+  }
   function start(job) {
     job.state = "working";
     if (job.opts.local) return startLocal(job);
@@ -121,6 +150,13 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     p.on("error", e => Object.assign(job, { state: "error", error: "تعذر تشغيل yt-dlp: " + e.message }));
     p.on("close", async code => {
       job.proc = null;
+      // Lost the connection: wait for it instead of failing, keeping the partial file so it resumes.
+      if (job.state === "working" && code !== 0 && lastError(err) === NET_ERR && !(await isOnline([hostOf(job.opts.url)]))) {
+        if (job.state === "working") Object.assign(job, { state: "offline", speed: "", eta: "" });
+        watchNetwork();
+        pump();
+        return;
+      }
       // Paused jobs keep their partial files so resuming continues where it stopped.
       if (job.state !== "paused" && job.state !== "stopping") fs.rm(tempDir, { recursive: true, force: true }, () => {});
       if (job.state === "working") {
@@ -277,8 +313,8 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     async jobs() { return { jobs: [...jobs.values()].reverse().map(publicJob) }; },
     async cancel({ id }) {
       const j = jobs.get(id);
-      if (j && ["working", "queued", "paused"].includes(j.state)) {
-        const wasPaused = j.state === "paused";
+      if (j && ["working", "queued", "paused", "offline"].includes(j.state)) {
+        const wasPaused = j.state === "paused" || j.state === "offline";
         j.state = "cancelled";
         killTree(j.proc);
         if (wasPaused) fs.rm(path.join(dataDir, "tmp", j.id), { recursive: true, force: true }, () => {});
@@ -315,7 +351,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
     },
     async pause({ id }) {
       const j = jobs.get(id);
-      if (j && (j.state === "working" || j.state === "queued")) { j.state = "paused"; j.speed = ""; j.eta = ""; j.progress = j.opts.local ? 0 : j.progress; killTree(j.proc); pump(); }
+      if (j && ["working", "queued", "offline"].includes(j.state)) { j.state = "paused"; j.speed = ""; j.eta = ""; j.progress = j.opts.local ? 0 : j.progress; killTree(j.proc); pump(); }
       return { ok: true };
     },
     // Resume a paused job or retry a failed/cancelled one.
@@ -491,8 +527,9 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   const stopAll = () => {
     shuttingDown = true;
     stopLan();
+    clearInterval(netTimer);
     clearTimeout(saveTimer);
-    const keep = [...jobs.values()].filter(j => ["queued", "working", "paused"].includes(j.state))
+    const keep = [...jobs.values()].filter(j => ["queued", "working", "paused", "offline"].includes(j.state))
       .map(({ id, opts, title, state, progress, files }) => ({ id, opts, title, state, progress, files }));
     try { fs.writeFileSync(queueFile, JSON.stringify(keep)); } catch {}
     for (const j of jobs.values()) {
@@ -509,7 +546,7 @@ function startServer({ webDir, binDir, dataDir, defaultOut, openPath, pickFolder
   // Checked at launch (at most once a day), before any queued download starts.
   const stale = !settings.lastUpdate || Date.now() - settings.lastUpdate > 24 * 3600 * 1000;
   const ready = stale && fs.existsSync(ytdlp) ? selfUpdate().catch(() => {}) : Promise.resolve();
-  return new Promise(resolve => server.listen(0, "127.0.0.1", () => { ready.then(pump); resolve({ port: server.address().port, stopAll }); }));
+  return new Promise(resolve => server.listen(0, "127.0.0.1", () => { ready.then(pump); resolve({ port: server.address().port, stopAll, close: () => { server.closeAllConnections(); server.close(); } }); }));
 }
 
 module.exports = { startServer };

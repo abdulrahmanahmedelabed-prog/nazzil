@@ -266,13 +266,14 @@ const seen = new Set((() => { try { return JSON.parse(sessionStorage.getItem("nz
 const emptyState = (ic, title, hint) => `<div class="empty">${icon(ic)}<b>${esc(t(title))}</b>${hint ? `<small>${esc(t(hint))}</small>` : ""}</div>`;
 function renderJobs(jobs) {
   const box = $("queue");
-  const active = jobs.filter(j => j.state === "queued" || j.state === "working").length;
+  const active = jobs.filter(j => ["queued", "working", "offline"].includes(j.state)).length;
   $("queueCount").textContent = active || "";
   if (!jobs.length) { box.innerHTML = emptyState("dl", "لا توجد تنزيلات بعد", "الصق رابطًا في الأعلى أو اسحبه إلى النافذة."); return; }
   box.innerHTML = jobs.map(j => {
     const pct = Math.max(0, Math.min(100, j.progress || 0));
     let line;
     if (j.state === "queued") line = `<span>${t("في الانتظار…")}</span>`;
+    else if (j.state === "offline") line = `<span class="offline-line">${icon("wifi-off")}${t("بانتظار الإنترنت… سيبدأ تلقائيًا")}</span>${pct ? `<span>${pct.toFixed(0)}%</span>` : ""}`;
     else if (j.state === "working") line = `<span>${j.stage === "cover" ? t("جارٍ إضافة الغلاف…") : j.stage === "post" ? t("جارٍ التحويل…") : j.stage === "convert" ? t("جارٍ التحويل") + " · " + pct.toFixed(0) + "%" : pct.toFixed(0) + "%"}${j.items > 1 ? ` · ${j.item || 1}/${j.items}` : ""}</span><span dir="ltr">${esc(j.speed || "")} ${j.eta ? "· " + esc(j.eta) : ""}</span>`;
     else if (j.state === "paused") line = `<span>${t("متوقف مؤقتًا")} · ${pct.toFixed(0)}%</span>`;
     else if (j.state === "done") line = `<span>${t("اكتمل")}${j.count > 1 ? ` · ${j.count} ${t("ملف")}` : ""}${j.warning ? ` · ${esc(t(j.warning))}` : ""}</span>` + (isWeb()
@@ -281,7 +282,7 @@ function renderJobs(jobs) {
     else if (j.state === "cancelled") line = `<span>${t("أُلغي")}</span>`;
     else line = `<span>${esc(t(j.error || "تعذر إكمال العملية"))}</span>`;
     const b = (act, ic, label) => `<button type="button" data-act="${act}" data-id="${esc(j.id)}" title="${esc(t(label))}" aria-label="${esc(t(label))}">${icon(ic)}</button>`;
-    const active = j.state === "queued" || j.state === "working";
+    const active = ["queued", "working", "offline"].includes(j.state);
     const btn = '<span class="job-actions">' + (
       active ? (j.local ? "" : b("pause", "pause", "إيقاف مؤقت")) + b("cancel", "x", "إلغاء")
       : j.state === "paused" ? b("resume", "play", "استئناف") + b("cancel", "x", "إلغاء")
@@ -302,7 +303,7 @@ async function pollJobs() {
         saveHistory({ file: isWeb() ? `/dl/${j.id}/0` : j.file, web: isWeb(), name: j.title, kind: j.kind, count: j.count, at: Date.now() });
       }
     }
-    const busy = jobs.some(j => j.state === "queued" || j.state === "working");
+    const busy = jobs.some(j => ["queued", "working", "offline"].includes(j.state));
     pollTimer = setTimeout(pollJobs, busy ? 800 : 4000);
   } catch {
     pollTimer = setTimeout(pollJobs, 3000);
@@ -357,10 +358,10 @@ $("form").addEventListener("submit", async e => {
     };
     if (urls.length > 1) {
       for (const u of urls) await rpc("download", { ...body, url: u, title: u, playlist: false });
-      toast("أُضيفت الروابط إلى قائمة التنزيل ✓");
+      toast(navigator.onLine ? "أُضيفت الروابط إلى قائمة التنزيل ✓" : "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.");
     } else {
       await rpc("download", body);
-      toast("أُضيف إلى قائمة التنزيل ✓");
+      toast(navigator.onLine ? "أُضيف إلى قائمة التنزيل ✓" : "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.");
     }
     selectTab("queue");
     if (innerWidth <= 980) $("tabQueue").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -614,15 +615,17 @@ $("openTakeout").addEventListener("click", () => {
 /* ---------- Support: keeps Nazzil free with no ads ---------- */
 // Full edition / Windows: GitHub Sponsors. Google Play edition: Play Billing tips (prices come from Play).
 const SUPPORT_URL = "https://github.com/sponsors/abdulrahmanahmedelabed-prog";
-const ACCENTS = [["lime", "أخضر"], ["sky", "أزرق"], ["violet", "بنفسجي"], ["rose", "وردي"], ["amber", "ذهبي"], ["teal", "فيروزي"]];
+const ACCENTS = [["violet", "بنفسجي"], ["lime", "أخضر"], ["sky", "أزرق"], ["rose", "وردي"], ["amber", "ذهبي"], ["teal", "فيروزي"]];
+const FREE_ACCENTS = ["violet", "lime"]; // violet is Nazzil's color; the other four thank supporters
+const accentOf = () => (isSupporter() || FREE_ACCENTS.includes(prefs.accent)) && prefs.accent || "violet";
 const TIERS = { tip_coffee: "قهوة", supporter: "داعم", tip_gold: "داعم ذهبي" };
 const NUDGE_AT = [10, 60, 250]; // finished downloads before a gentle "support?" banner (never for supporters)
 let products = [];
 const isSupporter = () => !!store.get(SUPPORTER, false);
 const canSupport = () => !isStore() || products.length > 0; // the Play edition needs its products from Google Play
 function applyAccent() {
-  const a = isSupporter() ? prefs.accent : "";
-  if (a && a !== "lime") document.body.dataset.accent = a; else delete document.body.dataset.accent;
+  const a = accentOf();
+  if (a !== "lime") document.body.dataset.accent = a; else delete document.body.dataset.accent; // lime is the base palette in style.css
 }
 function renderSupport() {
   const fan = isSupporter();
@@ -632,9 +635,9 @@ function renderSupport() {
     ? products.map(p => `<button type="button" class="btn sm${p.id === "supporter" ? " primary" : ""}" data-buy="${esc(p.id)}">${esc(t(TIERS[p.id] || p.id))} · <bdi>${esc(p.price)}</bdi></button>`).join("")
     : isStore() ? ""
     : `<button type="button" class="btn primary sm" data-sponsor>${icon("heart")}${esc(t("ادعم على GitHub"))}</button>` + (fan ? "" : `<button type="button" class="btn sm" data-honor>${esc(t("دعمتُ نزّل"))}</button>`);
-  const current = fan ? prefs.accent || "lime" : "lime";
+  const current = accentOf();
   $("accents").innerHTML = ACCENTS.map(([id, name]) => {
-    const locked = !fan && id !== "lime";
+    const locked = !fan && !FREE_ACCENTS.includes(id);
     return `<button type="button" class="swatch" role="radio" data-c="${id}" aria-checked="${current === id}" aria-label="${esc(t(name))}" title="${esc(t(name))}"${locked ? " data-locked" : ""}>${locked ? icon("lock") : ""}</button>`;
   }).join("");
 }

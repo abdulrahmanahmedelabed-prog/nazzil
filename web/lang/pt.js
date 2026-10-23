@@ -200,5 +200,7 @@ NzI18n.add("pt", {
   "ذهبي": "Âmbar",
   "فيروزي": "Turquesa",
   "المزيد": "Mais",
-  "منصات أخرى": "Mais plataformas"
+  "منصات أخرى": "Mais plataformas",
+  "بانتظار الإنترنت… سيبدأ تلقائيًا": "Aguardando internet… começa sozinho",
+  "لا يوجد إنترنت. أُضيف إلى القائمة وسيبدأ عند عودة الاتصال.": "Sem internet. Adicionado à fila; começa quando a conexão voltar."
 });

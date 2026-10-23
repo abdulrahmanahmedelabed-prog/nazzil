@@ -4,6 +4,7 @@
     <string name="channel_finished">पूरे हुए डाउनलोड</string>
     <string name="download_done">डाउनलोड पूरा हुआ</string>
     <string name="download_failed">डाउनलोड विफल</string>
+    <string name="waiting_network">Nazzil · इंटरनेट का इंतज़ार</string>
     <plurals name="downloads_running">
         <item quantity="one">Nazzil · %d डाउनलोड चल रहा है</item>
         <item quantity="other">Nazzil · %d डाउनलोड चल रहे हैं</item>

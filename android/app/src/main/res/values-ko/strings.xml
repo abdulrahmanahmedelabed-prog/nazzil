@@ -4,6 +4,7 @@
     <string name="channel_finished">완료된 다운로드</string>
     <string name="download_done">다운로드 완료</string>
     <string name="download_failed">다운로드 실패</string>
+    <string name="waiting_network">Nazzil · 인터넷 연결 대기 중</string>
     <plurals name="downloads_running">
         <item quantity="other">Nazzil · %d개 다운로드 중</item>
     </plurals>

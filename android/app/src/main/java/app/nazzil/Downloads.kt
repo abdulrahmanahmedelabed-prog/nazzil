@@ -6,6 +6,9 @@ import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -45,7 +48,34 @@ object Downloads {
     val saved = ConcurrentHashMap<String, Uri>()
     @Volatile var parallel = 3
 
-    fun init(context: Context) { app = context.applicationContext }
+    fun init(context: Context) { app = context.applicationContext; watchNetwork() }
+
+    // Offline queue: links added (or downloads cut off) without internet wait as "offline"
+    // and start by themselves as soon as the connection is back.
+    private const val NET_ERR = "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة."
+    private fun online(): Boolean {
+        val cm = app.getSystemService(ConnectivityManager::class.java) ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+    private fun watchNetwork() {
+        runCatching {
+            app.getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) = wake()
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) wake()
+                }
+            })
+        }
+    }
+    private fun wake() {
+        val waiting = jobs.values.filter { it.state() == "offline" }
+        if (waiting.isEmpty()) return
+        waiting.forEach { it.set("state" to "queued") }
+        pump()
+    }
+    /** True when every active job is just waiting for the connection (for the notification). */
+    fun waitingForNetwork() = jobs.values.any { it.state() == "offline" } && jobs.values.none { it.state() == "working" || it.state() == "queued" }
 
     private fun workDir(id: String) = File(app.cacheDir, "jobs/$id")
 
@@ -77,7 +107,8 @@ object Downloads {
         order.reversed().forEach { id -> jobs[id]?.let { put(synchronized(it.info) { JSONObject(it.info.toString()) }) } }
     }
 
-    fun activeCount() = jobs.values.count { it.state() == "working" || it.state() == "queued" }
+    // Offline jobs count as active so the service (and with it the network callback) stays alive.
+    fun activeCount() = jobs.values.count { it.state() == "working" || it.state() == "queued" || it.state() == "offline" }
 
     /** Average progress of active jobs, for the notification. */
     fun activeProgress(): Int {
@@ -89,14 +120,14 @@ object Downloads {
     fun pause(id: String) = stop(id, "paused")
     fun cancel(id: String) {
         val j = jobs[id] ?: return
-        val wasPaused = j.state() == "paused"
+        val wasPaused = j.state() == "paused" || j.state() == "offline"
         stop(id, "cancelled")
         if (wasPaused) workDir(id).deleteRecursively()
     }
 
     private fun stop(id: String, newState: String) {
         val j = jobs[id] ?: return
-        if (j.state() !in listOf("queued", "working", "paused")) return
+        if (j.state() !in listOf("queued", "working", "paused", "offline")) return
         j.stopRequested = true
         j.set("state" to newState, "speed" to "", "eta" to "")
         runCatching { YoutubeDL.getInstance().destroyProcessById(id) }
@@ -116,14 +147,18 @@ object Downloads {
 
     fun dismiss(id: String) {
         val j = jobs[id] ?: return
-        if (j.state() in listOf("queued", "working")) return
+        if (j.state() in listOf("queued", "working", "offline")) return
         jobs.remove(id); order.remove(id)
         if (j.state() == "paused") workDir(id).deleteRecursively()
     }
 
     @Synchronized fun pump() {
         val working = jobs.values.count { it.state() == "working" }
-        order.mapNotNull { jobs[it] }.filter { it.state() == "queued" }.take(maxOf(0, parallel - working)).forEach { j ->
+        val net = online()
+        val ready = order.mapNotNull { jobs[it] }.filter { it.state() == "queued" }.filter { j ->
+            (j.local != null || net).also { ok -> if (!ok) j.set("state" to "offline", "speed" to "", "eta" to "") } // conversions don't need internet
+        }
+        ready.take(maxOf(0, parallel - working)).forEach { j ->
             j.set("state" to "working")
             Tools.io.execute { run(j) }
         }
@@ -167,6 +202,10 @@ object Downloads {
             job.set("state" to "done", "progress" to 100, "file" to key, "count" to made.size, "speed" to "", "eta" to "")
             notifyFinished(job, true)
         } catch (e: Exception) {
+            if (!job.stopRequested && friendly(e.message) == NET_ERR && !online()) {
+                job.set("state" to "offline", "speed" to "", "eta" to "") // keeps the partial file; resumes when back online
+                return
+            }
             if (!job.stopRequested) {
                 job.set("state" to "error", "error" to friendly(e.message))
                 notifyFinished(job, false)
@@ -387,7 +426,7 @@ object Downloads {
             Regex("Private video|Sign in|login", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "المحتوى خاص أو يتطلب تسجيل الدخول."
             Regex("unavailable|not available|removed", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "المقطع غير متاح."
             Regex("HTTP Error 404|Not Found", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "الرابط غير موجود. تأكد منه وحاول مجددًا."
-            Regex("Unable to download webpage|Failed to resolve|timed out|Connection", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة."
+            Regex("Unable to download webpage|Failed to resolve|timed out|Connection|getaddrinfo|unreachable|name resolution|No address associated|Name or service not known", RegexOption.IGNORE_CASE).containsMatchIn(line) -> "تعذر الاتصال. تحقق من الإنترنت ثم أعد المحاولة."
             Regex("403|Forbidden").containsMatchIn(line) -> "رفض الموقع الطلب. جرّب تحديث محرك التنزيل من الإعدادات."
             line.isNotBlank() -> line.substringAfter("ERROR:").trim()
             else -> "تعذر إكمال العملية."

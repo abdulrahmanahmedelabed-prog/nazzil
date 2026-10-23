@@ -327,3 +327,6 @@ body.light[data-accent="teal"]{--accent:#7ef0de;--accent-2:#36d7c2;--accent-text
 .nudge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 12px 0;padding:10px 12px;border-radius:var(--radius-sm);background:var(--accent-soft);border:1px solid var(--line)}
 .nudge>svg{color:var(--accent-text);fill:currentColor}
 .nudge span{flex:1 1 180px;min-width:0;font-weight:700;font-size:12.5px}
+.offline-line{display:inline-flex;align-items:center;gap:6px;color:var(--accent-text);font-weight:700}
+.offline-line svg{width:15px;height:15px}
+.job.offline .bar i{background:var(--line-2)}

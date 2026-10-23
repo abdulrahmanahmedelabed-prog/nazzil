@@ -4,6 +4,7 @@
     <string name="channel_finished">Завершённые загрузки</string>
     <string name="download_done">Загрузка завершена</string>
     <string name="download_failed">Ошибка загрузки</string>
+    <string name="waiting_network">Nazzil · ждём интернет</string>
     <plurals name="downloads_running">
         <item quantity="one">Nazzil · %d загрузка</item>
         <item quantity="few">Nazzil · %d загрузки</item>

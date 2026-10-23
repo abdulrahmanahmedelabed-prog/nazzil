@@ -4,6 +4,7 @@
     <string name="channel_finished">مکمل ڈاؤن لوڈز</string>
     <string name="download_done">ڈاؤن لوڈ مکمل</string>
     <string name="download_failed">ڈاؤن لوڈ ناکام</string>
+    <string name="waiting_network">Nazzil · انٹرنیٹ کا انتظار</string>
     <plurals name="downloads_running">
         <item quantity="one">Nazzil · %d ڈاؤن لوڈ جاری</item>
         <item quantity="other">Nazzil · %d ڈاؤن لوڈز جاری</item>

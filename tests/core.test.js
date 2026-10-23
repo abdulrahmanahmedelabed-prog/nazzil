@@ -221,7 +221,7 @@ test("Windows and Android notifications speak every app language", () => {
     assert.ok(TEXT[c].length === 3 && TEXT[c].every(Boolean), `notify-text ${c}`);
     const dir = "android/app/src/main/res/values" + (c === "en" ? "" : "-" + (c === "id" ? "in" : c)); // Android still files Indonesian as "in"
     const xml = read(dir + "/strings.xml");
-    for (const name of ["channel_downloads", "channel_finished", "download_done", "download_failed", "downloads_running"]) assert.ok(xml.includes(`name="${name}"`), `${dir}: ${name}`);
+    for (const name of ["channel_downloads", "channel_finished", "download_done", "download_failed", "downloads_running", "waiting_network"]) assert.ok(xml.includes(`name="${name}"`), `${dir}: ${name}`);
     assert.match(xml, /quantity="other">[^<]*%d/, `${dir}: plural needs %d`);
   }
 });

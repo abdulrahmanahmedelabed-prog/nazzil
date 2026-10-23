@@ -4,6 +4,7 @@
     <string name="channel_finished">Descargas completadas</string>
     <string name="download_done">Descarga completada</string>
     <string name="download_failed">Error en la descarga</string>
+    <string name="waiting_network">Nazzil · esperando conexión</string>
     <plurals name="downloads_running">
         <item quantity="one">Nazzil · %d descarga en curso</item>
         <item quantity="many">Nazzil · %d descargas en curso</item>
